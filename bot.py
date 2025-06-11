@@ -14,7 +14,9 @@ class Bot(commands.Bot):
 
     def __init__(self, bot_token: str, command_prefix: str) -> None:
         super().__init__(
-            command_prefix=command_prefix, intents=discord.Intents.default()
+            command_prefix=command_prefix,
+            intents=discord.Intents.default(),
+            case_insensitive=True,
         )
         self._token = bot_token
 
