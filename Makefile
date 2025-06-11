@@ -4,8 +4,8 @@ start: # start bot
 
 .PHONY: fix
 fix: # fix code format
-	poetry run ruff check --fix 
 	poetry run ruff format
+	poetry run ruff check --fix 
 
 .PHONY: setup
 setup: # setup tools
@@ -17,3 +17,15 @@ setup: # setup tools
 .PHONY: typecheck
 typecheck:
 	poetry run pyright .
+
+.PHONY: setup-db
+setup-db:
+	docker compose up -d --build
+
+.PHONY: up-db
+up-db:
+	docker compose up -d
+
+.PHONY: down-db
+down-db:
+	docker compose down

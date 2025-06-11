@@ -16,8 +16,9 @@ asdfでPythonとNodejsをインストール & Poetryで依存関係をインス�
 
 ## データベース関連
 
--  DBコンテナをセットアップ `docker compose up -d --build`
--  DBコンテナを停止 `docker compose down`
+-  DBコンテナをセットアップ(初回) `make setup-db`
+-  DBコンテナを起動 `make up-db`
+-  DBコンテナを停止 `make down-db`
 
 ## Botアカウントの取得
 
