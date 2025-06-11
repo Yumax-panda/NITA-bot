@@ -14,13 +14,16 @@ dependencies = [
     "typing-extensions (>=4.14.0,<5.0.0)",
 ]
 
-
 [build-system]
 requires = ["poetry-core>=2.0.0,<3.0.0"]
 build-backend = "poetry.core.masonry.api"
 
+[tool.poetry]
+package-mode = false
+
 [tool.poetry.group.dev.dependencies]
 ruff = "^0.11.13"
+pyright = "^1.1.401"
 
 [tool.ruff.lint]
 # ref: https://docs.astral.sh/ruff/linter/
@@ -39,5 +42,14 @@ select = [
     "I",
 ]
 
-[tool.ruff.lint.flake8-type-checking]
-quote-annotations = true
+[tool.pyright]
+typeCheckingMode = "basic"
+include = [
+    "cogs",
+]
+exclude = [
+    "**/__pycache__",
+    ".venv/"
+]
+venvPath = "."
+venv = ".venv"

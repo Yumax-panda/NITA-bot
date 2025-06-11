@@ -12,8 +12,7 @@
 
 ## セットアップ
 
-1. asdf経由でPythonのインストール `asdf install`
-2. poetryで依存関係をインストール `poetry install`
+asdfでPythonとNodejsをインストール & Poetryで依存関係をインストール．`make setup`
 
 ## データベース関連
 
@@ -31,3 +30,4 @@
 ## その他
 
 - コード整形 & インポートのソート等 `make fix`
+- 型チェック `make typecheck`
