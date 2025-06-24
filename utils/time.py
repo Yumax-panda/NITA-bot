@@ -46,7 +46,7 @@ def display_time(time_ms: int) -> str:
     ms = time_ms % 1000
     time_sec = time_ms // 1000
 
-    sec = time_ms % 60
+    sec = time_sec % 60
     minutes = time_sec // 60
 
     return f"{minutes}:{sec:02}.{ms:03}"
