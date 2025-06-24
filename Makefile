@@ -29,3 +29,7 @@ up-db:
 .PHONY: down-db
 down-db:
 	docker compose down
+
+.PHONY: test
+test:
+	poetry run pytest

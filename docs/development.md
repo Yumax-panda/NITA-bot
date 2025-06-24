@@ -32,3 +32,4 @@ asdfでPythonとNodejsをインストール & Poetryで依存関係をインス�
 
 - コード整形 & インポートのソート等 `make fix`
 - 型チェック `make typecheck`
+- テスト `make test`
