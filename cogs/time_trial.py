@@ -33,7 +33,7 @@ class TimeTrial(Cog, name="NITA", description="NITA関連"):
     ) -> None:
         await ctx.defer()
 
-        await self.bot.repo.create_time_trial(
+        await self.repo.create_time_trial(
             user_discord_id=str(ctx.author.id),
             track=track,
             time_ms=time_ms,
@@ -51,7 +51,7 @@ class TimeTrial(Cog, name="NITA", description="NITA関連"):
         self, ctx: commands.Context[Bot], track: Annotated[Track, TrackConverter]
     ) -> None:
         await ctx.defer()
-        data = await self.bot.repo.get_leader_board(
+        data = await self.repo.get_leader_board(
             user_discord_ids=[str(ctx.author.id)], track=track
         )
         await ctx.send(f"data: {data}")
