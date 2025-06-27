@@ -40,15 +40,39 @@ class Track(Enum):
         self.name_ja = name_ja
         self.abbr_ja = abbr_ja
 
-        qual_aliases: set[str] = {name, name_ja}
+        qual_aliases: set[str] = {
+            name,
+            abbr,
+            name_ja,
+            abbr_ja,
+        }
 
         if aliases is not None:
             qual_aliases.update(aliases)
 
-        self.aliases = qual_aliases
+        # 大文字と小文字を区別せずに判別できるようにするため
+        self.aliases = set(map(lambda s: s.lower(), qual_aliases))
 
     def __str__(self) -> str:
         return self.name
+
+    @staticmethod
+    def from_nick(name: str) -> Track | None:
+        for track in Track:
+            if name.lower() in track.aliases:
+                return track
+
+        return None
+
+    @staticmethod
+    def search(name: str) -> list[Track]:
+        ret: list[Track] = []
+
+        for track in Track:
+            if any(name.lower() in alias for alias in track.aliases):
+                ret.append(track)
+
+        return ret
 
     # TODO: 略称とエイリアスを追加する
     MBC = ("Mario Bros. Circuit", "MBC", "マリオブラザーズサーキット", "")
