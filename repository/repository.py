@@ -3,10 +3,16 @@ from __future__ import annotations
 import ssl
 from typing import TYPE_CHECKING
 
+from sqlalchemy import func, select, tuple_
 from sqlalchemy.ext.asyncio import create_async_engine
+
+from model.core import metadata
+from model.time_trials import TimeTrialData, time_trials
 
 if TYPE_CHECKING:
     from sqlalchemy.ext.asyncio import AsyncEngine
+
+    from mkworld.game_data.tracks import Track
 
 __all__ = ("get_repository", "Repository")
 
@@ -40,10 +46,91 @@ def get_repository(
 
 
 class Repository:
-    __slots__ = ("_engine",)
+    __slots__ = ("engine",)
 
     if TYPE_CHECKING:
-        _engine: AsyncEngine
+        engine: AsyncEngine
 
     def __init__(self, engine: AsyncEngine) -> None:
-        self._engine = engine
+        self.engine = engine
+
+    async def sync(self) -> None:
+        async with self.engine.begin() as conn:
+            await conn.run_sync(metadata.create_all)
+
+    # TODO: return で TimeTrialData | Noneにしたい．
+    async def create_time_trial(
+        self, user_discord_id: str, track: Track, time_ms: int
+    ) -> None:
+        query = time_trials.insert().values(
+            user_discord_id=user_discord_id,
+            track_name=track.name,
+            time_ms=time_ms,
+        )
+
+        async with self.engine.connect() as conn, conn.begin() as tx:
+            try:
+                await conn.execute(query)
+                await tx.commit()
+
+            except Exception as e:
+                await tx.rollback()
+                raise e
+
+    async def get_leader_board(
+        self, user_discord_ids: list[str], track: Track
+    ) -> list[TimeTrialData]:
+        """指定したユーザーの最新タイムを取得する．
+
+        Parameters
+        ----------
+        user_discord_ids : list[str]
+            取得したいユーザーのdiscord ID.
+        track : Track
+            コース．
+
+        Returns
+        -------
+        list[TimeTrialData]
+            タイムアタックのデータ．
+        """
+        sub_query = (
+            select(
+                time_trials.c.user_discord_id,
+                func.max(time_trials.c.created_at).label("max_created_at"),
+            )
+            .where(
+                time_trials.c.user_discord_id.in_(user_discord_ids),
+                time_trials.c.track_name == track.name,
+            )
+            .group_by(time_trials.c.user_discord_id)
+            .subquery()
+        )
+
+        query = (
+            time_trials.select()
+            .join(
+                sub_query,
+                tuple_(time_trials.c.user_discord_id, time_trials.c.created_at)
+                == tuple_(sub_query.c.user_discord_id, sub_query.c.max_created_at),
+            )
+            .where(time_trials.c.track_name == track.name)
+        )
+
+        async with self.engine.connect() as conn:
+            result = await conn.execute(query)
+
+        ret: list[TimeTrialData] = []
+
+        for data in result.fetchall():
+            ret.append(
+                TimeTrialData(
+                    id=data.id,
+                    user_discord_id=data.user_discord_id,
+                    track_name=data.track_name,
+                    time_ms=data.time_ms,
+                    created_at=data.created_at,
+                    updated_at=data.updated_at,
+                )
+            )
+        return ret
