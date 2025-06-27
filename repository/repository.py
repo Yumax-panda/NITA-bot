@@ -58,13 +58,12 @@ class Repository:
         async with self.engine.begin() as conn:
             await conn.run_sync(metadata.create_all)
 
-    # TODO: return で TimeTrialData | Noneにしたい．
     async def create_time_trial(
         self, user_discord_id: str, track: Track, time_ms: int
     ) -> None:
         query = time_trials.insert().values(
             user_discord_id=user_discord_id,
-            track_name=track.name,
+            track=track.abbr,
             time_ms=time_ms,
         )
 
@@ -101,7 +100,7 @@ class Repository:
             )
             .where(
                 time_trials.c.user_discord_id.in_(user_discord_ids),
-                time_trials.c.track_name == track.name,
+                time_trials.c.track == track.abbr,
             )
             .group_by(time_trials.c.user_discord_id)
             .subquery()
@@ -114,7 +113,7 @@ class Repository:
                 tuple_(time_trials.c.user_discord_id, time_trials.c.created_at)
                 == tuple_(sub_query.c.user_discord_id, sub_query.c.max_created_at),
             )
-            .where(time_trials.c.track_name == track.name)
+            .where(time_trials.c.track == track.abbr)
         )
 
         async with self.engine.connect() as conn:
@@ -127,7 +126,7 @@ class Repository:
                 TimeTrialData(
                     id=data.id,
                     user_discord_id=data.user_discord_id,
-                    track_name=data.track_name,
+                    track=data.track,
                     time_ms=data.time_ms,
                     created_at=data.created_at,
                     updated_at=data.updated_at,

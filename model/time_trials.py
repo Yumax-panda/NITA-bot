@@ -18,8 +18,8 @@ time_trials = Table(
     Column("id", Integer, primary_key=True, autoincrement=True),
     # discord IDは20桁以下だが，余裕を持つ
     Column("user_discord_id", VARCHAR(25), nullable=False),
-    # 今後のコース追加にも対応できるように長めにする．
-    Column("track_name", VARCHAR(50), nullable=False),
+    # Track.abbrに対応, 今後のコース追加にも対応できるように長めにする．
+    Column("track", VARCHAR(10), nullable=False),
     Column("time_ms", Integer, nullable=False),
     Column("created_at", TIMESTAMP, nullable=False, server_default=func.now()),
     # ref: https://docs.sqlalchemy.org/en/20/dialects/mysql.html#mysql-timestamp-onupdate
@@ -36,7 +36,7 @@ time_trials = Table(
 class TimeTrialData:
     id: int
     user_discord_id: str
-    track_name: str
+    track: str
     time_ms: int
     created_at: datetime
     updated_at: datetime
