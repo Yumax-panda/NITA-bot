@@ -15,6 +15,7 @@ __all__ = ("Bot",)
 
 logger = logging.getLogger(__name__)
 extensions = [
+    "cogs.meta",
     "cogs.time_trial",
 ]
 
