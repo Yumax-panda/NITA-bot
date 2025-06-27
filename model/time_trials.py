@@ -1,8 +1,16 @@
+from __future__ import annotations
+
+from dataclasses import dataclass
+from typing import TYPE_CHECKING
+
 from sqlalchemy import TIMESTAMP, VARCHAR, Column, Integer, Table, func, text
 
 from .core import metadata
 
-__all__ = ("time_trials",)
+if TYPE_CHECKING:
+    from datetime import datetime
+
+__all__ = ("time_trials", "TimeTrialData")
 
 time_trials = Table(
     "time_trials",
@@ -22,3 +30,13 @@ time_trials = Table(
         server_default=text("CURRENT_TIMESTAMP ON UPDATE CURRENT_TIMESTAMP"),
     ),
 )
+
+
+@dataclass(frozen=True, slots=True)
+class TimeTrialData:
+    id: int
+    user_discord_id: str
+    track_name: str
+    time_ms: int
+    created_at: datetime
+    updated_at: datetime
