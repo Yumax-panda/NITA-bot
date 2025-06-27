@@ -3,6 +3,7 @@ from __future__ import annotations
 import logging
 from typing import TYPE_CHECKING
 
+import aiohttp
 import discord
 from discord.ext import commands
 
@@ -26,6 +27,7 @@ class Bot(commands.Bot):
         repo: Repository
         bot_app_info: AppInfo
         owner_id: int
+        session: aiohttp.ClientSession
 
     def __init__(self, bot_token: str, repo: Repository, command_prefix: str) -> None:
         intents = discord.Intents.default()
@@ -40,6 +42,8 @@ class Bot(commands.Bot):
         self._token = bot_token
 
     async def setup_hook(self) -> None:
+        self.session = aiohttp.ClientSession()
+
         for extension in extensions:
             try:
                 await self.load_extension(extension)
