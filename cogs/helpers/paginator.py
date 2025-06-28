@@ -190,7 +190,7 @@ class Paginator(View):
     async def indicator(self, interaction: Interaction, _: Button) -> None:
         return
 
-    @button(label="<", custom_id="Paginator_next_button", style=ButtonStyle.green)
+    @button(label=">", custom_id="Paginator_next_button", style=ButtonStyle.green)
     async def goto_next(self, interaction: Interaction, _: Button) -> None:
         await self.goto_page(interaction, self.current_page + 1)
 
