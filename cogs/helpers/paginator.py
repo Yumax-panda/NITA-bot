@@ -160,8 +160,8 @@ class Paginator(View):
         if interaction.response.is_done():
             if self.message:
                 self.message = await self.message.edit(**kwargs, view=self)
-            else:
-                await interaction.response.edit_message(**kwargs, view=self)
+        else:
+            await interaction.response.edit_message(**kwargs, view=self)
 
     async def on_timeout(self) -> None:
         if self.message:
