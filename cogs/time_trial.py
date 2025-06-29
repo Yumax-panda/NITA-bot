@@ -108,10 +108,12 @@ class TimeTrial(GroupCog, name="NITA", description="NITA関連", group_name="nit
 
         if wr is not None:
             diff_ms = new_record.time_ms - wr.time_ms
-            new_record_brief += f" ({format_time_diff(diff_ms)})"
+            new_record_brief += f" (WR {format_time_diff(diff_ms)})"
 
+        e.set_thumbnail(
+            url=f"https://raw.githubusercontent.com/Yumax-panda/MKWorld/refs/heads/main/tracks/{track.id}.webp"
+        )
         e.add_field(name="New Record", value=new_record_brief, inline=False)
-        e.set_footer(text=str(ctx.author), icon_url=ctx.author.display_avatar.url)
 
         await ctx.send(embed=e)
 
