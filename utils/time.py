@@ -1,6 +1,10 @@
 import re
 
-__all__ = ("input_text_to_time_ms", "display_time")
+__all__ = (
+    "input_text_to_time_ms",
+    "display_time",
+    "format_time_diff",
+)
 
 _TIME_INPUT_REGEX = re.compile(r"[0-9]{6}")
 
@@ -50,3 +54,23 @@ def display_time(time_ms: int) -> str:
     minutes = time_sec // 60
 
     return f"{minutes}:{sec:02}.{ms:03}"
+
+
+def format_time_diff(diff_ms: int) -> str:
+    negative = diff_ms < 0
+
+    abs_diff = abs(diff_ms)
+    ms = abs_diff % 1000
+
+    diff_sec = abs_diff // 1000
+    sec = diff_sec % 60
+    minutes = diff_sec // 60
+
+    ret = f"{sec:02}.{ms:03}"
+
+    if minutes > 0:
+        ret = f"{minutes}:{ret}"
+
+    if negative:
+        return f"-{ret}"
+    return f"+{ret}"
