@@ -66,7 +66,7 @@ def format_time_diff(diff_ms: int) -> str:
     sec = diff_sec % 60
     minutes = diff_sec // 60
 
-    ret = f"{sec:02}.{ms:03}"
+    ret = f"{sec}.{ms:03}"
 
     if minutes > 0:
         ret = f"{minutes}:{ret}"
