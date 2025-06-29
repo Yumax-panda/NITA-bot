@@ -3,7 +3,7 @@ from __future__ import annotations
 import ssl
 from typing import TYPE_CHECKING
 
-from sqlalchemy import func, select, tuple_
+from sqlalchemy import asc, func, select, tuple_
 from sqlalchemy.ext.asyncio import create_async_engine
 
 from model.core import metadata
@@ -63,7 +63,7 @@ class Repository:
     ) -> None:
         query = time_trials.insert().values(
             user_discord_id=user_discord_id,
-            track=track.abbr,
+            track=track.id,
             time_ms=time_ms,
         )
 
@@ -100,7 +100,7 @@ class Repository:
             )
             .where(
                 time_trials.c.user_discord_id.in_(user_discord_ids),
-                time_trials.c.track == track.abbr,
+                time_trials.c.track == track.id,
             )
             .group_by(time_trials.c.user_discord_id)
             .subquery()
@@ -113,7 +113,37 @@ class Repository:
                 tuple_(time_trials.c.user_discord_id, time_trials.c.created_at)
                 == tuple_(sub_query.c.user_discord_id, sub_query.c.max_created_at),
             )
-            .where(time_trials.c.track == track.abbr)
+            .where(time_trials.c.track == track.id)
+        )
+
+        async with self.engine.connect() as conn:
+            result = await conn.execute(query)
+
+        ret: list[TimeTrialData] = []
+
+        for data in result.fetchall():
+            ret.append(
+                TimeTrialData(
+                    id=data.id,
+                    user_discord_id=data.user_discord_id,
+                    track=data.track,
+                    time_ms=data.time_ms,
+                    created_at=data.created_at,
+                    updated_at=data.updated_at,
+                )
+            )
+        return ret
+
+    async def get_time_trial_history(
+        self, user_discord_id: str, track: Track
+    ) -> list[TimeTrialData]:
+        query = (
+            time_trials.select()
+            .where(
+                time_trials.c.track == track.id,
+                time_trials.c.user_discord_id == user_discord_id,
+            )
+            .order_by(asc(time_trials.c.created_at))
         )
 
         async with self.engine.connect() as conn:
