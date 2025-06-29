@@ -74,6 +74,10 @@ class Track(Enum):
 
         return ret
 
+    @property
+    def id(self) -> str:
+        return self.abbr
+
     # TODO: 略称とエイリアスを追加する
     MBC = ("Mario Bros. Circuit", "MBC", "マリオブラザーズサーキット", "")
     CC = ("Crown City", "CC", "トロフィーシティ", "")
