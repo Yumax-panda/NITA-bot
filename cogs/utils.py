@@ -8,10 +8,13 @@ if TYPE_CHECKING:
     from bot import Bot
     from repository import Repository
 
-__all__ = ("Cog",)
+__all__ = (
+    "Cog",
+    "GroupCog",
+)
 
 
-class Cog(commands.Cog):
+class CogMixin:
     if TYPE_CHECKING:
         bot: Bot
 
@@ -22,3 +25,11 @@ class Cog(commands.Cog):
     @property
     def repo(self) -> Repository:
         return self.bot.repo
+
+
+class Cog(commands.Cog, CogMixin):
+    pass
+
+
+class GroupCog(commands.GroupCog, CogMixin):
+    pass

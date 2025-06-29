@@ -12,7 +12,7 @@ from mkworld.game_data.tracks import Track
 
 from .helpers.autocomplete import query_track_autocomplete
 from .helpers.converter import TimeMsConverter, TrackConverter
-from .utils import Cog
+from .utils import GroupCog
 
 if TYPE_CHECKING:
     from bot import Bot
@@ -57,7 +57,7 @@ logger = logging.getLogger(__name__)
 
 
 # TODO
-class TimeTrial(Cog, name="NITA", description="NITA関連"):
+class TimeTrial(GroupCog, name="NITA", description="NITA関連", group_name="nita"):
     if TYPE_CHECKING:
         _wr_cache: dict[str, TimeTrialResponseData]
 
