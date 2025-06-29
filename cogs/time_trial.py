@@ -2,13 +2,13 @@ from __future__ import annotations
 
 import logging
 from dataclasses import dataclass
-from typing import TYPE_CHECKING, Annotated
+from typing import TYPE_CHECKING, Annotated, Any
 
-from discord import app_commands
+from discord import Color, Embed, app_commands
 from discord.ext import commands, tasks
 
-from error import BotError
 from mkworld.game_data.tracks import Track
+from utils.time import display_time, format_time_diff
 
 from .helpers.autocomplete import query_track_autocomplete
 from .helpers.converter import TimeMsConverter, TrackConverter
@@ -47,6 +47,13 @@ class TimeTrialResponseData:
     player_name: str | None = None
     player_country_code: str | None = None
 
+    @staticmethod
+    def from_dict(payload: dict) -> TimeTrialResponseData:
+        proofs: list[dict[str, Any]] = payload.pop("proofs")
+        return TimeTrialResponseData(
+            **payload, proofs=list(map(lambda p: ProofResponseData(**p), proofs))
+        )
+
 
 @dataclass(frozen=True, slots=True)
 class LeaderboardResponseData:
@@ -81,13 +88,32 @@ class TimeTrial(GroupCog, name="NITA", description="NITA関連", group_name="nit
         time_ms: Annotated[int, TimeMsConverter],
     ) -> None:
         await ctx.defer()
+        user_discord_id = str(ctx.author.id)
 
         await self.repo.create_time_trial(
-            user_discord_id=str(ctx.author.id),
+            user_discord_id=user_discord_id,
             track=track,
             time_ms=time_ms,
         )
-        await ctx.send(f"登録完了: {track}, time_ms: {time_ms}")
+
+        history = await self.repo.get_time_trial_history(
+            user_discord_id=user_discord_id, track=track
+        )
+
+        new_record = history[-1]
+        e = Embed(title=track.name_ja, color=Color.green())
+
+        new_record_brief = f"> {display_time(new_record.time_ms)}"
+        wr = await self.fetch_wr(track)
+
+        if wr is not None:
+            diff_ms = new_record.time_ms - wr.time_ms
+            new_record_brief += f" ({format_time_diff(diff_ms)})"
+
+        e.add_field(name="New Record", value=new_record_brief, inline=False)
+        e.set_footer(text=str(ctx.author), icon_url=ctx.author.display_avatar.url)
+
+        await ctx.send(embed=e)
 
     @commands.hybrid_command(
         aliases=["t", "show"],
@@ -113,16 +139,15 @@ class TimeTrial(GroupCog, name="NITA", description="NITA関連", group_name="nit
         )
         await ctx.send(f"data: {data}")
 
-    async def fetch_wr(self, track: Track) -> TimeTrialResponseData:
+    async def fetch_wr(self, track: Track) -> TimeTrialResponseData | None:
         try:
             return self._wr_cache[track.abbr]
         except KeyError:
             wr = await self.fetch_wr_without_cache(track)
-        if wr is not None:
-            self._wr_cache[track.abbr] = wr
-            return wr
-        # TODO: もっとマシなエラー処理を考える.
-        raise BotError(f"{track.name_ja}のワールドレコードを取得できませんでした.")
+            if wr is not None:
+                self._wr_cache[track.abbr] = wr
+                return wr
+        return None
 
     async def fetch_wr_without_cache(
         self, track: Track
@@ -131,8 +156,21 @@ class TimeTrial(GroupCog, name="NITA", description="NITA関連", group_name="nit
 
         async with self.bot.session.get(url) as resp:
             if resp.ok:
-                payload: LeaderboardResponseData = await resp.json()
-                return payload.records[0]
+                payload = await resp.json()
+                data = LeaderboardResponseData(
+                    records=list(
+                        map(
+                            lambda d: TimeTrialResponseData.from_dict(d),
+                            payload["records"],
+                        )
+                    )
+                )
+
+                if not data.records:
+                    logger.info(f"Track: {track.name} has no WR.")
+                    return None
+
+                return data.records[0]
             else:
                 logger.error(f"API {url}(GET) returned {resp.status}.")
                 return None
