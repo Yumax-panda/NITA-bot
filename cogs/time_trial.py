@@ -2,12 +2,13 @@ from __future__ import annotations
 
 import logging
 from dataclasses import dataclass
-from typing import TYPE_CHECKING, Annotated, Any
+from typing import TYPE_CHECKING, Annotated
 
 from discord import Color, Embed, app_commands
 from discord.ext import commands, tasks
 
 from mkworld.game_data.tracks import Track
+from utils.base_model import BaseModel
 from utils.time import display_time, format_time_diff
 
 from .helpers.autocomplete import query_track_autocomplete
@@ -22,7 +23,7 @@ MKC_API = "https://mkcentral.com/api"
 
 # ref: https://github.com/MarioKartCentral/MarioKartCentral/blob/main/src/backend/common/data/models/time_trials_api.py
 @dataclass(frozen=True, slots=True)
-class ProofResponseData:
+class ProofResponseData(BaseModel):
     id: str
     url: str
     type: str
@@ -33,7 +34,7 @@ class ProofResponseData:
 
 
 @dataclass(frozen=True, slots=True)
-class TimeTrialResponseData:
+class TimeTrialResponseData(BaseModel):
     id: str
     version: int
     player_id: int
@@ -47,16 +48,9 @@ class TimeTrialResponseData:
     player_name: str | None = None
     player_country_code: str | None = None
 
-    @staticmethod
-    def from_dict(payload: dict) -> TimeTrialResponseData:
-        proofs: list[dict[str, Any]] = payload.pop("proofs")
-        return TimeTrialResponseData(
-            **payload, proofs=list(map(lambda p: ProofResponseData(**p), proofs))
-        )
-
 
 @dataclass(frozen=True, slots=True)
-class LeaderboardResponseData:
+class LeaderboardResponseData(BaseModel):
     records: list[TimeTrialResponseData]
 
 
@@ -159,14 +153,7 @@ class TimeTrial(GroupCog, name="NITA", description="NITA関連", group_name="nit
         async with self.bot.session.get(url) as resp:
             if resp.ok:
                 payload = await resp.json()
-                data = LeaderboardResponseData(
-                    records=list(
-                        map(
-                            lambda d: TimeTrialResponseData.from_dict(d),
-                            payload["records"],
-                        )
-                    )
-                )
+                data = LeaderboardResponseData.from_dict(payload)
 
                 if not data.records:
                     logger.info(f"Track: {track.name} has no WR.")
