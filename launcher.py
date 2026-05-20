@@ -45,8 +45,10 @@ if __name__ == "__main__":
     container.config.db_port.from_env("DB_PORT", as_=int, default=3306)
     container.config.db_name.from_env("DB_NAME", default="mkbot")
     container.config.ssl_ca_path.from_env("SSL_CA_PATH", default=None)
-    container.config.bot_token.from_env("BOT_TOKEN", required=True)
+    container.config.bot_token.from_env("BOT_TOKEN")
     container.config.command_prefix.from_env("COMMAND_PREFIX", default="!")
+    container.config.from_yaml("./config.local.yml")
+    container.config.load()
     container.wire(modules=[__name__])
 
     main()
