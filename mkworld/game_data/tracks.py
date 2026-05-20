@@ -78,6 +78,10 @@ class Track(Enum):
     def id(self) -> str:
         return self.abbr
 
+    @property
+    def image_url(self) -> str:
+        return f"https://raw.githubusercontent.com/Yumax-panda/MKWorld/refs/heads/main/tracks/{self.id}.webp"
+
     # TODO: 略称とエイリアスを追加する
     MBC = ("Mario Bros. Circuit", "MBC", "マリオブラザーズサーキット", "")
     CC = ("Crown City", "CC", "トロフィーシティ", "")

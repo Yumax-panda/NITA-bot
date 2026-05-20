@@ -7,12 +7,14 @@ from typing import TYPE_CHECKING, Annotated
 from discord import Color, Embed, app_commands
 from discord.ext import commands, tasks
 
+from error import BotError
 from mkworld.game_data.tracks import Track
 from utils.base_model import BaseModel
 from utils.time import display_time, format_time_diff
 
 from .helpers.autocomplete import query_track_autocomplete
 from .helpers.converter import TimeMsConverter, TrackConverter
+from .helpers.paginator import AutoResizedPaginator, EmbedPaginator
 from .utils import GroupCog
 
 if TYPE_CHECKING:
@@ -22,7 +24,7 @@ MKC_API = "https://mkcentral.com/api"
 
 
 # ref: https://github.com/MarioKartCentral/MarioKartCentral/blob/main/src/backend/common/data/models/time_trials_api.py
-@dataclass(frozen=True, slots=True)
+@dataclass(frozen=True)
 class ProofResponseData(BaseModel):
     id: str
     url: str
@@ -104,9 +106,7 @@ class TimeTrial(GroupCog, name="NITA", description="NITA関連", group_name="nit
             diff_ms = new_record.time_ms - wr.time_ms
             new_record_brief += f" (WR {format_time_diff(diff_ms)})"
 
-        e.set_thumbnail(
-            url=f"https://raw.githubusercontent.com/Yumax-panda/MKWorld/refs/heads/main/tracks/{track.id}.webp"
-        )
+        e.set_thumbnail(url=track.image_url)
         e.add_field(name="New Record", value=new_record_brief, inline=False)
 
         await ctx.send(embed=e)
@@ -133,7 +133,37 @@ class TimeTrial(GroupCog, name="NITA", description="NITA関連", group_name="nit
             user_discord_ids=list(map(lambda m: str(m.id), ctx.guild.members)),
             track=track,
         )
-        await ctx.send(f"data: {data}")
+
+        if not data:
+            raise BotError(f"{track.name_ja}はまだタイムが記録されていません.")
+
+        template = Embed(title=track.name, color=Color.green())
+        template.set_thumbnail(url=track.image_url)
+        paginator = EmbedPaginator(template=template)
+        wr = await self.fetch_wr(track)
+
+        for i, record in enumerate(data):
+            prefix = f"{i + 1}."
+
+            if i == 0:
+                prefix = "🥇"
+            elif i == 1:
+                prefix = "🥈"
+            elif i == 2:
+                prefix = "🥉"
+
+            value = f"> {display_time(record.time_ms)}"
+
+            if wr is not None:
+                diff = record.time_ms - wr.time_ms
+                value += f" (WR {format_time_diff(diff)})"
+
+            user = ctx.guild.get_member(int(record.user_discord_id))
+            user_name = user.display_name if user is not None else "N/A"
+
+            paginator.add_field(name=f"{prefix} {user_name}", value=value, inline=False)
+
+        await AutoResizedPaginator(pages=paginator.to_pages(), context=ctx).start()
 
     async def fetch_wr(self, track: Track) -> TimeTrialResponseData | None:
         try:

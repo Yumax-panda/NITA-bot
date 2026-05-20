@@ -5,6 +5,8 @@ from typing import TYPE_CHECKING
 
 from sqlalchemy import TIMESTAMP, VARCHAR, Column, Integer, Table, func, text
 
+from utils.base_model import BaseModel
+
 from .core import metadata
 
 if TYPE_CHECKING:
@@ -33,7 +35,7 @@ time_trials = Table(
 
 
 @dataclass(frozen=True, slots=True)
-class TimeTrialData:
+class TimeTrialData(BaseModel):
     id: int
     user_discord_id: str
     track: str

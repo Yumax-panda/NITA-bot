@@ -23,13 +23,20 @@ if TYPE_CHECKING:
         content: str | None
         embeds: list[Embed]
 
+    class EmbedField(TypedDict):
+        name: str
+        value: str
+        inline: bool
+
 else:
     PaginatorStartKwargs = dict
     PaginatorEditKwargs = dict
+    EmbedField = dict
 
 __all__ = (
     "Page",
     "Paginator",
+    "AutoResizedPaginator",
 )
 
 
@@ -197,3 +204,59 @@ class Paginator(View):
     @button(label=">>", custom_id="Paginator_last_button", style=ButtonStyle.green)
     async def goto_last(self, interaction: Interaction, _: Button) -> None:
         await self.goto_page(interaction, self.page_count - 1)
+
+
+class AutoResizedPaginator(Paginator):
+    def __init__(
+        self,
+        *,
+        pages: list[Page],
+        context: commands.Context[Bot],
+        timeout: float | None = None,
+        current_page: int = 0,
+        compact: bool = False,
+    ) -> None:
+        View.__init__(self, timeout=timeout)
+        self.pages = pages
+        self.context = context
+        self.message = None
+        self.current_page = current_page
+        self.compact = compact
+
+        self.clear_items()
+
+        if len(pages) >= 2:
+            self.fill_items()
+            self.update_buttons()
+
+
+class EmbedPaginator:
+    __slots__ = (
+        "fields",
+        "template",
+    )
+
+    if TYPE_CHECKING:
+        fields: list[EmbedField]
+        template: Embed
+
+    def __init__(self, template: Embed) -> None:
+        self.template = template
+        self.fields = []
+
+    def add_field(self, name: str, value: str, inline: bool) -> None:
+        self.fields.append({"name": name, "value": value, "inline": inline})
+
+    def to_pages(self) -> list[Page]:
+        MAX_FIELDS = 25
+        pages: list[Page] = []
+
+        for i in range(0, len(self.fields), MAX_FIELDS):
+            e = self.template.copy()
+
+            for field in self.fields[i : i + MAX_FIELDS]:
+                e.add_field(**field)
+
+            pages.append(Page(embed=e))
+
+        return pages
