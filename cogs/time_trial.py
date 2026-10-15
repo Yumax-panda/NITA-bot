@@ -76,7 +76,7 @@ class TimeTrial(GroupCog, name="NITA", description="NITA関連", group_name="nit
     )
     @app_commands.describe(track="例: トロフィーシティ", time_ms="例: 140123")
     @app_commands.autocomplete(track=query_track_autocomplete)
-    @app_commands.rename(time_ms="time")  # プログラム内のパラメータ名と合わせるため
+    @app_commands.rename(time_ms="time")
     async def submit(
         self,
         ctx: commands.Context[Bot],
@@ -86,28 +86,40 @@ class TimeTrial(GroupCog, name="NITA", description="NITA関連", group_name="nit
         await ctx.defer()
         user_discord_id = str(ctx.author.id)
 
+        previous_pb = await self.repo.get_personal_best(
+            user_discord_id=user_discord_id, track=track
+        )
+
         await self.repo.create_time_trial(
             user_discord_id=user_discord_id,
             track=track,
             time_ms=time_ms,
         )
 
-        history = await self.repo.get_time_trial_history(
-            user_discord_id=user_discord_id, track=track
-        )
-
-        new_record = history[-1]
         e = Embed(title=track.name_ja, color=Color.green())
+        new_record_brief = f"> {display_time(time_ms)}"
 
-        new_record_brief = f"> {display_time(new_record.time_ms)}"
+        is_pb = previous_pb is None or time_ms < previous_pb.time_ms
+
+        if is_pb and previous_pb is not None:
+            diff_ms = time_ms - previous_pb.time_ms
+            new_record_brief += f" ({format_time_diff(diff_ms)})"
+
         wr = await self.fetch_wr(track)
 
         if wr is not None:
-            diff_ms = new_record.time_ms - wr.time_ms
+            diff_ms = time_ms - wr.time_ms
             new_record_brief += f" (WR {format_time_diff(diff_ms)})"
 
         e.set_thumbnail(url=track.image_url)
-        e.add_field(name="New Record", value=new_record_brief, inline=False)
+
+        if is_pb:
+            e.add_field(name="🎉 New Record!", value=new_record_brief, inline=False)
+        else:
+            e.add_field(name="New Record", value=new_record_brief, inline=False)
+            if previous_pb is not None:
+                pb_info = f"> {display_time(previous_pb.time_ms)}"
+                e.add_field(name="Current Best", value=pb_info, inline=False)
 
         await ctx.send(embed=e)
 
@@ -137,6 +149,8 @@ class TimeTrial(GroupCog, name="NITA", description="NITA関連", group_name="nit
         if not data:
             raise BotError(f"{track.name_ja}はまだタイムが記録されていません.")
 
+        data.sort(key=lambda x: x.time_ms)
+
         template = Embed(title=track.name, color=Color.green())
         template.set_thumbnail(url=track.image_url)
         paginator = EmbedPaginator(template=template)
@@ -164,6 +178,123 @@ class TimeTrial(GroupCog, name="NITA", description="NITA関連", group_name="nit
             paginator.add_field(name=f"{prefix} {user_name}", value=value, inline=False)
 
         await AutoResizedPaginator(pages=paginator.to_pages(), context=ctx).start()
+
+    @commands.hybrid_command(
+        aliases=["d"],
+        description="指定したコースの記録を削除する.",
+        usage="<コース名>",
+    )
+    @app_commands.describe(track="例: トロフィーシティ")
+    @app_commands.autocomplete(track=query_track_autocomplete)
+    async def delete(
+        self, ctx: commands.Context[Bot], track: Annotated[Track, TrackConverter]
+    ) -> None:
+        await ctx.defer()
+        user_discord_id = str(ctx.author.id)
+
+        success = await self.repo.delete_time_trial(
+            user_discord_id=user_discord_id, track=track
+        )
+
+        if success:
+            e = Embed(
+                title="記録を削除しました",
+                description=f"{track.name_ja}の記録を削除しました.",
+                color=Color.red(),
+            )
+            e.set_thumbnail(url=track.image_url)
+        else:
+            raise BotError(f"{track.name_ja}の記録が見つかりませんでした.")
+
+        await ctx.send(embed=e)
+
+    @commands.hybrid_command(
+        aliases=["r"],
+        description=(
+            "自分の記録を表示する. コースを指定しない場合は全コースの記録を表示する."
+        ),
+        usage="[コース名]",
+    )
+    @app_commands.describe(track="例: トロフィーシティ (省略可)")
+    @app_commands.autocomplete(track=query_track_autocomplete)
+    async def record(
+        self,
+        ctx: commands.Context[Bot],
+        track: Annotated[Track | None, TrackConverter] = None,
+    ) -> None:
+        await ctx.defer()
+        user_discord_id = str(ctx.author.id)
+
+        if track is not None:
+            history = await self.repo.get_time_trial_history(
+                user_discord_id=user_discord_id, track=track
+            )
+
+            if not history:
+                raise BotError(f"{track.name_ja}の記録がありません.")
+
+            pb = min(history, key=lambda x: x.time_ms)
+            e = Embed(title=f"{track.name_ja} - 記録履歴", color=Color.blue())
+            e.set_thumbnail(url=track.image_url)
+
+            pb_value = f"> {display_time(pb.time_ms)}"
+            wr = await self.fetch_wr(track)
+
+            if wr is not None:
+                diff_ms = pb.time_ms - wr.time_ms
+                pb_value += f" (WR {format_time_diff(diff_ms)})"
+
+            e.add_field(name="🏆 Best Time", value=pb_value, inline=False)
+
+            recent = history[-5:][::-1]  # 新しい順
+            if recent:
+                recent_lines = []
+                for record in recent:
+                    time_str = display_time(record.time_ms)
+                    diff_str = ""
+                    if record.time_ms == pb.time_ms:
+                        diff_str = " 🏆"
+                    else:
+                        diff = record.time_ms - pb.time_ms
+                        diff_str = f" ({format_time_diff(diff)})"
+                    recent_lines.append(f"> {time_str}{diff_str}")
+
+                e.add_field(
+                    name=f"最近の記録 (全{len(history)}件)",
+                    value="\n".join(recent_lines),
+                    inline=False,
+                )
+
+            await ctx.send(embed=e)
+
+        else:
+            # 全コースの記録を表示
+            records = await self.repo.get_user_records(user_discord_id=user_discord_id)
+
+            if not records:
+                raise BotError("まだ記録がありません.")
+
+            template = Embed(
+                title=f"{ctx.author.display_name} の記録", color=Color.blue()
+            )
+            paginator = EmbedPaginator(template=template)
+
+            for record in records:
+                track_obj = Track.from_nick(record.track)
+
+                if track_obj is None:
+                    continue
+
+                value = f"> {display_time(record.time_ms)}"
+                wr = await self.fetch_wr(track_obj)
+
+                if wr is not None:
+                    diff = record.time_ms - wr.time_ms
+                    value += f" (WR {format_time_diff(diff)})"
+
+                paginator.add_field(name=track_obj.name_ja, value=value, inline=False)
+
+            await AutoResizedPaginator(pages=paginator.to_pages(), context=ctx).start()
 
     async def fetch_wr(self, track: Track) -> TimeTrialResponseData | None:
         try:

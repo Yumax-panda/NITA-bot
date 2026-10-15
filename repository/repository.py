@@ -163,3 +163,127 @@ class Repository:
                 )
             )
         return ret
+
+    async def delete_time_trial(self, user_discord_id: str, track: Track) -> bool:
+        """指定したユーザーのコースの記録を削除する．
+
+        Parameters
+        ----------
+        user_discord_id : str
+            ユーザーのDiscord ID.
+        track : Track
+            コース．
+
+        Returns
+        -------
+        bool
+            削除に成功したかどうか．
+        """
+        query = time_trials.delete().where(
+            time_trials.c.user_discord_id == user_discord_id,
+            time_trials.c.track == track.id,
+        )
+
+        async with self.engine.connect() as conn, conn.begin() as tx:
+            try:
+                result = await conn.execute(query)
+                await tx.commit()
+                return result.rowcount > 0
+            except Exception as e:
+                await tx.rollback()
+                raise e
+
+    async def get_user_records(self, user_discord_id: str) -> list[TimeTrialData]:
+        """指定したユーザーの全コースの最速タイムを取得する．
+
+        Parameters
+        ----------
+        user_discord_id : str
+            ユーザーのDiscord ID.
+
+        Returns
+        -------
+        list[TimeTrialData]
+            各コースの最速タイム．
+        """
+        sub_query = (
+            select(
+                time_trials.c.track,
+                func.min(time_trials.c.time_ms).label("min_time_ms"),
+            )
+            .where(time_trials.c.user_discord_id == user_discord_id)
+            .group_by(time_trials.c.track)
+            .subquery()
+        )
+
+        query = (
+            time_trials.select()
+            .join(
+                sub_query,
+                (time_trials.c.track == sub_query.c.track)
+                & (time_trials.c.time_ms == sub_query.c.min_time_ms),
+            )
+            .where(time_trials.c.user_discord_id == user_discord_id)
+            .order_by(asc(time_trials.c.track))
+        )
+
+        async with self.engine.connect() as conn:
+            result = await conn.execute(query)
+
+        ret: list[TimeTrialData] = []
+
+        for data in result.fetchall():
+            ret.append(
+                TimeTrialData(
+                    id=data.id,
+                    user_discord_id=data.user_discord_id,
+                    track=data.track,
+                    time_ms=data.time_ms,
+                    created_at=data.created_at,
+                    updated_at=data.updated_at,
+                )
+            )
+        return ret
+
+    async def get_personal_best(
+        self, user_discord_id: str, track: Track
+    ) -> TimeTrialData | None:
+        """指定したユーザーの指定コースの最速タイムを取得する．
+
+        Parameters
+        ----------
+        user_discord_id : str
+            ユーザーのDiscord ID.
+        track : Track
+            コース．
+
+        Returns
+        -------
+        TimeTrialData | None
+            最速タイム．記録がない場合はNone．
+        """
+        query = (
+            time_trials.select()
+            .where(
+                time_trials.c.user_discord_id == user_discord_id,
+                time_trials.c.track == track.id,
+            )
+            .order_by(asc(time_trials.c.time_ms))
+            .limit(1)
+        )
+
+        async with self.engine.connect() as conn:
+            result = await conn.execute(query)
+            data = result.fetchone()
+
+        if data is None:
+            return None
+
+        return TimeTrialData(
+            id=data.id,
+            user_discord_id=data.user_discord_id,
+            track=data.track,
+            time_ms=data.time_ms,
+            created_at=data.created_at,
+            updated_at=data.updated_at,
+        )
