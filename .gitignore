@@ -112,3 +112,6 @@ firebase.json
 
 # mysql
 mysql/
+
+# claude
+.claude
