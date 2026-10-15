@@ -93,7 +93,7 @@ class Track(Enum):
     rAF = ("Airship Fortress", "rAF", "キラーシップ", "")
     rDKP = ("DK Pass", "rDKP", "DKスノーマウンテン", "")
     SP = ("Starview Peak", "SP", "ロゼッタてんもんだい", "")
-    rSHS = ("Sky High Sundae", "rSHS", "アイスビルディング", "")
+    rSHS = ("Sky-High Sundae", "rSHS", "アイスビルディング", "")
     rWSh = ("Wario Shipyard", "rWSh", "ワリオシップ", "")
     rKTB = ("Koopa Troopa Beach", "rKTB", "ノコノコビーチ", "")
     FO = ("Faraway Oasis", "FO", "リバーサイドサファリ", "")
