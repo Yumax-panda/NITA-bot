@@ -89,37 +89,34 @@ class TimeTrial(GroupCog, name="NITA", description="NITA関連", group_name="nit
         previous_pb = await self.repo.get_personal_best(
             user_discord_id=user_discord_id, track=track
         )
-
-        await self.repo.create_time_trial(
-            user_discord_id=user_discord_id,
-            track=track,
-            time_ms=time_ms,
-        )
-
-        e = Embed(title=track.name_ja, color=Color.green())
-        new_record_brief = f"> {display_time(time_ms)}"
-
+        wr = await self.fetch_wr(track)
         is_pb = previous_pb is None or time_ms < previous_pb.time_ms
 
-        if is_pb and previous_pb is not None:
-            diff_ms = time_ms - previous_pb.time_ms
-            new_record_brief += f" ({format_time_diff(diff_ms)})"
-
-        wr = await self.fetch_wr(track)
-
-        if wr is not None:
-            diff_ms = time_ms - wr.time_ms
-            new_record_brief += f" (WR {format_time_diff(diff_ms)})"
-
+        e = Embed(title=track.name_ja, color=Color.green())
         e.set_thumbnail(url=track.image_url)
 
-        if is_pb:
-            e.add_field(name="🎉 New Record!", value=new_record_brief, inline=False)
+        input_value = f"> {display_time(time_ms)}"
+        if wr is not None:
+            input_value += f" (WR {format_time_diff(time_ms - wr.time_ms)})"
+        e.add_field(name="Input Time", value=input_value, inline=False)
+
+        if previous_pb is None:
+            e.add_field(name="Your Record", value="-", inline=False)
         else:
-            e.add_field(name="New Record", value=new_record_brief, inline=False)
-            if previous_pb is not None:
-                pb_info = f"> {display_time(previous_pb.time_ms)}"
-                e.add_field(name="Current Best", value=pb_info, inline=False)
+            pb_value = f"> {display_time(previous_pb.time_ms)}"
+            if wr is not None:
+                pb_value += (
+                    f" (WR {format_time_diff(previous_pb.time_ms - wr.time_ms)})"
+                )
+            e.add_field(name="Your Record", value=pb_value, inline=False)
+
+        if is_pb:
+            await self.repo.create_time_trial(
+                user_discord_id=user_discord_id,
+                track=track,
+                time_ms=time_ms,
+            )
+            e.set_footer(text=f"☑️ Updated by {ctx.author.name}")
 
         await ctx.send(embed=e)
 
