@@ -28,7 +28,7 @@ class TimeMsConverter(commands.Converter[int]):
 
         if time_ms is None:
             raise BotError(
-                f"入力: {argument}は不正です."
+                f"入力: {argument}は不正です.\n"
                 "1:40.123の場合, 140123のように入力してください."
             )
 
