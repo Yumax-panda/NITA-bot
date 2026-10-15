@@ -11,16 +11,23 @@ if TYPE_CHECKING:
 
 __all__ = ("query_track_autocomplete",)
 
+MAX_OPTION = 25
+
 
 async def query_track_autocomplete(
     _: Interaction, current: str
 ) -> list[app_commands.Choice[str]]:
     if not current:
-        return []
+        return list(
+            map(
+                lambda t: app_commands.Choice(name=t.name_ja, value=t.name),
+                Track,
+            )
+        )[:MAX_OPTION]
 
     return list(
         map(
             lambda t: app_commands.Choice(name=t.name_ja, value=t.name),
             Track.search(current),
         )
-    )[:25]
+    )[:MAX_OPTION]
