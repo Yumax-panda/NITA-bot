@@ -113,3 +113,15 @@ class Track(Enum):
     AH = ("Acorn Heights", "AH", "どんぐりツリーハウス", "")
     rMC = ("Mario Circuit", "rMC", "マリオサーキット", "")
     RR = ("Rainbow Road", "RR", "レインボーロード", "")
+
+    # DLC
+    sMC1 = ("SNES Mario Circuit 1", "sMC1", "SFCマリオサーキット1", "")
+    sMC2 = ("SNES Mario Circuit 2", "sMC2", "SFCマリオサーキット2", "")
+    sMC3 = ("SNES Mario Circuit 3", "sMC3", "SFCマリオサーキット3", "")
+    sGV1 = ("SNES Ghost Valley 1", "sGV1", "SFCおばけぬま1", "")
+    sGV2 = ("SNES Ghost Valley 2", "sGV2", "SFCおばけぬま2", "")
+    sGV3 = ("SNES Ghost Valley 3", "sGV3", "SFCおばけぬま3", "")
+    sCI1 = ("SNES Choco Island 1", "sCI1", "SFCチョコレーとう1", "")
+    sCI2 = ("SNES Choco Island 2", "sCI2", "SFCチョコレーとう2", "")
+    sVL1 = ("SNES Vanilla Lake 1", "sVL1", "SFCバニラレイク1", "")
+    sKB1 = ("SNES Koopa Beach 1", "sKB1", "SFCノコノコビーチ1", "")
