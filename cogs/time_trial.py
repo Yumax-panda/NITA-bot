@@ -231,7 +231,7 @@ class TimeTrial(GroupCog, name="NITA", description="NITA関連", group_name="nit
                 raise BotError(f"{track.name_ja}の記録がありません.")
 
             pb = min(history, key=lambda x: x.time_ms)
-            e = Embed(title=f"{track.name_ja} - 記録履歴", color=Color.blue())
+            e = Embed(title=track.name_ja, color=Color.blue())
             e.set_thumbnail(url=track.image_url)
 
             pb_value = f"> {display_time(pb.time_ms)}"
