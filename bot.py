@@ -7,6 +7,8 @@ import aiohttp
 import discord
 from discord.ext import commands
 
+from error import BotError
+
 if TYPE_CHECKING:
     from discord import AppInfo, User
 
@@ -68,3 +70,10 @@ class Bot(commands.Bot):
 
     def run(self) -> None:
         super().run(self._token)
+
+    # TODO
+    async def on_command_error(
+        self, context: commands.Context[Bot], exception: commands.CommandError
+    ) -> None:
+        if isinstance(exception, BotError):
+            await context.send(exception.message)
