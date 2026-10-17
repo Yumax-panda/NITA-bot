@@ -24,6 +24,7 @@ class Meta(Cog, name="Meta", description="便利機能"):
         await ctx.defer(ephemeral=True)
 
         embeds: list[Embed] = []
+        command_prefix = self.bot.command_prefix
 
         for cog in self.bot.cogs.values():
             commands_ = [c for c in cog.walk_commands() if not c.hidden]
@@ -32,20 +33,14 @@ class Meta(Cog, name="Meta", description="便利機能"):
                 continue
 
             embed = Embed(
-                title=cog.qualified_name,
-                description=cog.description or None,
+                title=cog.description or cog.qualified_name,
                 color=Color.blue(),
             )
             embed.set_footer(text="<必須> [任意]")
 
             for command in sorted(commands_, key=lambda c: c.qualified_name):
-                signature = command.usage or command.signature
-                name = f"{ctx.clean_prefix}{command.qualified_name}"
-
-                if signature:
-                    name = f"{name} {signature}"
-
-                description = command.description or command.short_doc or "―"
+                name = f"{command_prefix}{command.qualified_name} {command.usage or ""}"
+                description = command.description
                 embed.add_field(name=name, value=f"> {description}", inline=False)
 
             embeds.append(embed)
