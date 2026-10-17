@@ -36,7 +36,7 @@ else:
 __all__ = (
     "Page",
     "Paginator",
-    "AutoResizedPaginator",
+    "EmbedPaginator",
 )
 
 
@@ -83,7 +83,6 @@ class Paginator(View):
         context: commands.Context[Bot]
         pages: list[Page]
         current_page: int
-        compact: bool
 
     def __init__(
         self,
@@ -92,33 +91,18 @@ class Paginator(View):
         context: commands.Context[Bot],
         timeout: float | None = None,
         current_page: int = 0,
-        compact: bool = False,
     ) -> None:
         super().__init__(timeout=timeout)
         self.pages = pages
         self.context = context
         self.message = None
         self.current_page = current_page
-        self.compact = compact
 
-        self.clear_items()
-        self.fill_items()
-        self.update_buttons()
-
-    def fill_items(self) -> None:
-        if self.compact:
-            btns = [self.goto_prev, self.goto_next]
+        # 1ページで済むときはボタンを出さない.
+        if self.page_count <= 1:
+            self.clear_items()
         else:
-            btns = [
-                self.goto_first,
-                self.goto_prev,
-                self.indicator,
-                self.goto_next,
-                self.goto_last,
-            ]
-
-        for btn in btns:
-            self.add_item(btn)
+            self.update_buttons()
 
     def update_buttons(self) -> None:
         is_first = self.current_page <= 0
@@ -155,7 +139,10 @@ class Paginator(View):
         if initial_page.embeds:
             kwargs["embeds"] = initial_page.embeds
 
-        self.message = await self.context.send(**kwargs, view=self)
+        if self.page_count > 1:
+            self.message = await self.context.send(**kwargs, view=self)
+        else:
+            self.message = await self.context.send(**kwargs)
 
     async def goto_page(self, interaction: Interaction, page_number: int) -> None:
         page = self.pages[page_number]
@@ -204,30 +191,6 @@ class Paginator(View):
     @button(label=">>", custom_id="Paginator_last_button", style=ButtonStyle.green)
     async def goto_last(self, interaction: Interaction, _: Button) -> None:
         await self.goto_page(interaction, self.page_count - 1)
-
-
-class AutoResizedPaginator(Paginator):
-    def __init__(
-        self,
-        *,
-        pages: list[Page],
-        context: commands.Context[Bot],
-        timeout: float | None = None,
-        current_page: int = 0,
-        compact: bool = False,
-    ) -> None:
-        View.__init__(self, timeout=timeout)
-        self.pages = pages
-        self.context = context
-        self.message = None
-        self.current_page = current_page
-        self.compact = compact
-
-        self.clear_items()
-
-        if len(pages) >= 2:
-            self.fill_items()
-            self.update_buttons()
 
 
 class EmbedPaginator:

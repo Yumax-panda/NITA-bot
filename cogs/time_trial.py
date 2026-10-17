@@ -14,7 +14,7 @@ from utils.time import display_time, format_time_diff
 
 from .helpers.autocomplete import query_track_autocomplete
 from .helpers.converter import TimeMsConverter, TrackConverter
-from .helpers.paginator import AutoResizedPaginator, EmbedPaginator
+from .helpers.paginator import EmbedPaginator, Paginator
 from .utils import GroupCog
 
 if TYPE_CHECKING:
@@ -174,7 +174,7 @@ class TimeTrial(GroupCog, name="NITA", description="NITA関連", group_name="nit
 
             paginator.add_field(name=f"{prefix} {user_name}", value=value, inline=False)
 
-        await AutoResizedPaginator(pages=paginator.to_pages(), context=ctx).start()
+        await Paginator(pages=paginator.to_pages(), context=ctx).start()
 
     @commands.hybrid_command(
         aliases=["d"],
@@ -291,7 +291,7 @@ class TimeTrial(GroupCog, name="NITA", description="NITA関連", group_name="nit
 
                 paginator.add_field(name=track_obj.name_ja, value=value, inline=False)
 
-            await AutoResizedPaginator(pages=paginator.to_pages(), context=ctx).start()
+            await Paginator(pages=paginator.to_pages(), context=ctx).start()
 
     async def fetch_wr(self, track: Track) -> TimeTrialResponseData | None:
         try:
