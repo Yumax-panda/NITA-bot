@@ -3,7 +3,7 @@ from __future__ import annotations
 import ssl
 from typing import TYPE_CHECKING
 
-from sqlalchemy import asc, func, select, tuple_
+from sqlalchemy import asc, desc, func, select, tuple_
 from sqlalchemy.ext.asyncio import create_async_engine
 
 from model.core import metadata
@@ -165,7 +165,7 @@ class Repository:
         return ret
 
     async def delete_time_trial(self, user_discord_id: str, track: Track) -> bool:
-        """指定したユーザーのコースの記録を削除する．
+        """指定したユーザーのコースの記録を全て削除する．
 
         Parameters
         ----------
@@ -189,6 +189,59 @@ class Repository:
                 result = await conn.execute(query)
                 await tx.commit()
                 return result.rowcount > 0
+            except Exception as e:
+                await tx.rollback()
+                raise e
+
+    async def delete_latest_time_trial(
+        self, user_discord_id: str, track: Track
+    ) -> TimeTrialData | None:
+        """指定したユーザーのコースの直近1件の記録を削除する．
+
+        Parameters
+        ----------
+        user_discord_id : str
+            ユーザーのDiscord ID.
+        track : Track
+            コース．
+
+        Returns
+        -------
+        TimeTrialData | None
+            削除した記録．記録がない場合はNone．
+        """
+        select_query = (
+            time_trials.select()
+            .where(
+                time_trials.c.user_discord_id == user_discord_id,
+                time_trials.c.track == track.id,
+            )
+            .order_by(desc(time_trials.c.created_at), desc(time_trials.c.id))
+            .limit(1)
+        )
+
+        async with self.engine.connect() as conn, conn.begin() as tx:
+            try:
+                result = await conn.execute(select_query)
+                data = result.fetchone()
+
+                if data is None:
+                    await tx.rollback()
+                    return None
+
+                await conn.execute(
+                    time_trials.delete().where(time_trials.c.id == data.id)
+                )
+                await tx.commit()
+
+                return TimeTrialData(
+                    id=data.id,
+                    user_discord_id=data.user_discord_id,
+                    track=data.track,
+                    time_ms=data.time_ms,
+                    created_at=data.created_at,
+                    updated_at=data.updated_at,
+                )
             except Exception as e:
                 await tx.rollback()
                 raise e

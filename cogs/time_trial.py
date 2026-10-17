@@ -186,7 +186,7 @@ class TimeTrial(GroupCog, name="NITA", description="NITA関連", group_name="nit
 
     @commands.hybrid_command(
         aliases=["d"],
-        description="指定したコースの記録を削除する.",
+        description="指定したコースの直近の記録を削除する.",
         usage="<コース名>",
     )
     @app_commands.describe(track="例: トロフィーシティ")
@@ -197,20 +197,47 @@ class TimeTrial(GroupCog, name="NITA", description="NITA関連", group_name="nit
         await ctx.defer()
         user_discord_id = str(ctx.author.id)
 
+        deleted = await self.repo.delete_latest_time_trial(
+            user_discord_id=user_discord_id, track=track
+        )
+
+        if deleted is None:
+            raise BotError(f"{track.name_ja}の記録が見つかりませんでした.")
+
+        e = Embed(
+            title="直近の記録を削除しました",
+            description=f"{track.name_ja}: {display_time(deleted.time_ms)}",
+            color=Color.red(),
+        )
+        e.set_thumbnail(url=track.image_url)
+        await ctx.send(embed=e)
+
+    @commands.hybrid_command(
+        aliases=["da"],
+        description="指定したコースの記録を全て削除する.",
+        usage="<コース名>",
+    )
+    @app_commands.describe(track="例: トロフィーシティ")
+    @app_commands.autocomplete(track=query_track_autocomplete)
+    async def delete_all(
+        self, ctx: commands.Context[Bot], track: Annotated[Track, TrackConverter]
+    ) -> None:
+        await ctx.defer()
+        user_discord_id = str(ctx.author.id)
+
         success = await self.repo.delete_time_trial(
             user_discord_id=user_discord_id, track=track
         )
 
-        if success:
-            e = Embed(
-                title="記録を削除しました",
-                description=f"{track.name_ja}の記録を削除しました.",
-                color=Color.red(),
-            )
-            e.set_thumbnail(url=track.image_url)
-        else:
+        if not success:
             raise BotError(f"{track.name_ja}の記録が見つかりませんでした.")
 
+        e = Embed(
+            title="記録を全て削除しました",
+            description=f"{track.name_ja}の記録を全て削除しました.",
+            color=Color.red(),
+        )
+        e.set_thumbnail(url=track.image_url)
         await ctx.send(embed=e)
 
     @commands.hybrid_command(
