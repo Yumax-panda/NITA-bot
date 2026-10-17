@@ -146,14 +146,14 @@ class TimeTrial(GroupCog, name="NITA", description="NITA関連", group_name="nit
         if not data:
             raise BotError(f"{track.name_ja}はまだタイムが記録されていません.")
 
-        data.sort(key=lambda x: x.time_ms)
+        sorted_data = sorted(data, key=lambda x: x.time_ms)
 
         template = Embed(title=track.name, color=Color.green())
         template.set_thumbnail(url=track.image_url)
         paginator = EmbedPaginator(template=template)
         wr = await self.fetch_wr(track)
 
-        for i, record in enumerate(data):
+        for i, record in enumerate(sorted_data):
             prefix = f"{i + 1}."
 
             if i == 0:
@@ -173,6 +173,14 @@ class TimeTrial(GroupCog, name="NITA", description="NITA関連", group_name="nit
             user_name = user.display_name if user is not None else "N/A"
 
             paginator.add_field(name=f"{prefix} {user_name}", value=value, inline=False)
+
+        avg_time_ms = round(sum(record.time_ms for record in data) / len(data))
+        avg_value = f"> {display_time(avg_time_ms)}"
+
+        if wr is not None:
+            avg_value += f" (WR {format_time_diff(avg_time_ms - wr.time_ms)})"
+
+        paginator.add_field(name="Avg. Time", value=avg_value, inline=False)
 
         await Paginator(pages=paginator.to_pages(), context=ctx).start()
 
@@ -231,8 +239,9 @@ class TimeTrial(GroupCog, name="NITA", description="NITA関連", group_name="nit
                 raise BotError(f"{track.name_ja}の記録がありません.")
 
             pb = min(history, key=lambda x: x.time_ms)
-            e = Embed(title=track.name_ja, color=Color.blue())
+            e = Embed(title=track.name, color=Color.blue())
             e.set_thumbnail(url=track.image_url)
+            e.set_footer(text=f"{ctx.author.display_name}'s Record")
 
             pb_value = f"> {display_time(pb.time_ms)}"
             wr = await self.fetch_wr(track)
@@ -241,19 +250,24 @@ class TimeTrial(GroupCog, name="NITA", description="NITA関連", group_name="nit
                 diff_ms = pb.time_ms - wr.time_ms
                 pb_value += f" (WR {format_time_diff(diff_ms)})"
 
-            e.add_field(name="🏆 Best Time", value=pb_value, inline=False)
+            e.add_field(name="Your Record", value=pb_value, inline=False)
+
+            if wr is not None:
+                wr_value = f"{display_time(wr.time_ms)} (By {wr.player_name or 'N/A'})"
+                wr_link = wr.proofs[0].url if wr.proofs else None
+
+                if wr_link is not None:
+                    wr_value = f"[{wr_value}]({wr_link})"
+
+                e.add_field(name="WR", value=f"> {wr_value}", inline=False)
 
             recent = history[-5:][::-1]  # 新しい順
             if recent:
                 recent_lines = []
                 for record in recent:
                     time_str = display_time(record.time_ms)
-                    diff_str = ""
-                    if record.time_ms == pb.time_ms:
-                        diff_str = " 🏆"
-                    else:
-                        diff = record.time_ms - pb.time_ms
-                        diff_str = f" ({format_time_diff(diff)})"
+                    diff = record.time_ms - pb.time_ms
+                    diff_str = f" ({format_time_diff(diff)})"
                     recent_lines.append(f"> {time_str}{diff_str}")
 
                 e.add_field(
@@ -265,16 +279,18 @@ class TimeTrial(GroupCog, name="NITA", description="NITA関連", group_name="nit
             await ctx.send(embed=e)
 
         else:
-            # 全コースの記録を表示
             records = await self.repo.get_user_records(user_discord_id=user_discord_id)
 
             if not records:
                 raise BotError("まだ記録がありません.")
 
             template = Embed(
-                title=f"{ctx.author.display_name} の記録", color=Color.blue()
+                title=f"{ctx.author.display_name}'s Records", color=Color.blue()
             )
             paginator = EmbedPaginator(template=template)
+
+            diff_sum_ms = 0
+            diff_count = 0
 
             for record in records:
                 track_obj = Track.from_nick(record.track)
@@ -287,9 +303,19 @@ class TimeTrial(GroupCog, name="NITA", description="NITA関連", group_name="nit
 
                 if wr is not None:
                     diff = record.time_ms - wr.time_ms
+                    diff_sum_ms += diff
+                    diff_count += 1
                     value += f" (WR {format_time_diff(diff)})"
 
                 paginator.add_field(name=track_obj.name_ja, value=value, inline=False)
+
+            if diff_count > 0:
+                avg_diff = diff_sum_ms / diff_count / 1000
+                paginator.add_field(
+                    name="Avg. Diff.",
+                    value=f"> {avg_diff:.3f} ({diff_count} tracks)",
+                    inline=False,
+                )
 
             await Paginator(pages=paginator.to_pages(), context=ctx).start()
 
