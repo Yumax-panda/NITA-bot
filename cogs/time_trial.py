@@ -129,7 +129,7 @@ class TimeTrial(GroupCog, name="NITA", description="NITA関連", group_name="nit
     @app_commands.autocomplete(track=query_track_autocomplete)
     @commands.guild_only()
     @app_commands.guild_only()
-    async def track(
+    async def ranking(
         self, ctx: commands.Context[Bot], track: Annotated[Track, TrackConverter]
     ) -> None:
         await ctx.defer()
@@ -214,7 +214,7 @@ class TimeTrial(GroupCog, name="NITA", description="NITA関連", group_name="nit
         await ctx.send(embed=e)
 
     @commands.hybrid_command(
-        aliases=["r"],
+        aliases=["p"],
         description=(
             "自分の記録を表示する. コースを指定しない場合は全コースの記録を表示する."
         ),
@@ -222,7 +222,7 @@ class TimeTrial(GroupCog, name="NITA", description="NITA関連", group_name="nit
     )
     @app_commands.describe(track="例: トロフィーシティ (省略可)")
     @app_commands.autocomplete(track=query_track_autocomplete)
-    async def record(
+    async def profile(
         self,
         ctx: commands.Context[Bot],
         track: Annotated[Track | None, TrackConverter] = None,
