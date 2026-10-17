@@ -40,6 +40,7 @@ class Bot(commands.Bot):
             command_prefix=command_prefix,
             intents=intents,
             case_insensitive=True,
+            help_command=None,
         )
         self.repo = repo
         self._token = bot_token
