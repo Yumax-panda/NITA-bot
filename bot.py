@@ -34,6 +34,7 @@ class Bot(commands.Bot):
     def __init__(self, bot_token: str, repo: Repository, command_prefix: str) -> None:
         intents = discord.Intents.default()
         intents.message_content = True
+        intents.members = True
 
         super().__init__(
             command_prefix=command_prefix,
