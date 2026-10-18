@@ -39,7 +39,7 @@ class Meta(Cog, name="Meta", description="便利機能"):
             embed.set_footer(text="<必須> [任意]")
 
             for command in sorted(commands_, key=lambda c: c.qualified_name):
-                name = f"{command_prefix}{command.qualified_name} {command.usage or ""}"
+                name = f"{command_prefix}{command.qualified_name} {command.usage or ''}"
                 description = command.description
                 embed.add_field(name=name, value=f"> {description}", inline=False)
 

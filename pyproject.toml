@@ -31,6 +31,7 @@ package-mode = false
 ruff = "^0.11.13"
 pyright = "^1.1.401"
 pytest = "^8.4.1"
+pytest-asyncio = "^1.4.0"
 
 [tool.ruff.lint]
 # ref: https://docs.astral.sh/ruff/linter/
@@ -64,6 +65,7 @@ venv = ".venv"
 
 [tool.pytest.ini_options]
 addopts = "-v"
+asyncio_mode = "auto"
 testpaths = [
     "tests",
 ]
