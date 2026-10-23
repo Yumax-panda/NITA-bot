@@ -2,9 +2,10 @@ from __future__ import annotations
 
 import logging
 from dataclasses import dataclass
+from datetime import datetime, timedelta
 from typing import TYPE_CHECKING, Annotated
 
-from discord import Color, Embed, app_commands
+from discord import Color, Embed, app_commands, utils
 from discord.ext import commands, tasks
 
 from error import BotError
@@ -345,6 +346,61 @@ class TimeTrial(GroupCog, name="NITA", description="NITA関連", group_name="nit
                 )
 
             await Paginator(pages=paginator.to_pages(), context=ctx).start()
+
+    @commands.hybrid_command(
+        name="today",
+        description="直近24時間で更新した記録を表示する.",
+    )
+    async def today(self, ctx: commands.Context[Bot]) -> None:
+        await ctx.defer()
+        user_discord_id = str(ctx.author.id)
+
+        records = await self.repo.get_recently_updated_records(
+            user_discord_id=user_discord_id
+        )
+
+        if not records:
+            raise BotError("直近24時間で更新した記録がありません.")
+
+        now = datetime.now().astimezone()
+        since = now - timedelta(hours=24)
+
+        template = Embed(
+            title="Daily Records",
+            description=f"{utils.format_dt(since, 's')}~{utils.format_dt(now, 's')}",
+            color=Color.green(),
+        )
+        template.set_footer(
+            text=str(ctx.author), icon_url=ctx.author.display_avatar.url
+        )
+        paginator = EmbedPaginator(template=template)
+
+        latest_before = await self.repo.get_latest_before_24h(
+            user_discord_id=user_discord_id
+        )
+
+        grouped: dict[str, list[int]] = {}
+        for record in records:
+            grouped.setdefault(record.track, []).append(record.time_ms)
+
+        for track_nick, time_ms_list in grouped.items():
+            track_obj = Track.from_nick(track_nick)
+
+            if track_obj is None:
+                continue
+
+            latest = time_ms_list[0]
+            baseline = latest_before.get(track_nick)
+
+            if baseline is None:
+                value = f"> {display_time(latest)} (New)"
+            else:
+                diff = format_time_diff(latest - baseline)
+                value = f"> {display_time(baseline)} -> {display_time(latest)} ({diff})"
+
+            paginator.add_field(name=track_obj.name_ja, value=value, inline=False)
+
+        await Paginator(pages=paginator.to_pages(), context=ctx).start()
 
     async def fetch_wr(self, track: Track) -> TimeTrialResponseData | None:
         try:

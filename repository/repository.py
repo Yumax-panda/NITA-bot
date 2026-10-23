@@ -3,7 +3,7 @@ from __future__ import annotations
 import ssl
 from typing import TYPE_CHECKING
 
-from sqlalchemy import asc, desc, func, select, tuple_
+from sqlalchemy import asc, desc, func, select, text, tuple_
 from sqlalchemy.ext.asyncio import create_async_engine
 
 from model.core import metadata
@@ -297,6 +297,89 @@ class Repository:
                 )
             )
         return ret
+
+    async def get_recently_updated_records(
+        self, user_discord_id: str
+    ) -> list[TimeTrialData]:
+        """直近24時間で更新したユーザーの記録を取得する．
+
+        Parameters
+        ----------
+        user_discord_id : str
+            ユーザーのDiscord ID.
+
+        Returns
+        -------
+        list[TimeTrialData]
+            直近24時間で更新した記録．更新が新しい順．
+        """
+        query = (
+            time_trials.select()
+            .where(
+                time_trials.c.user_discord_id == user_discord_id,
+                time_trials.c.updated_at >= text("NOW() - INTERVAL 1 DAY"),
+            )
+            .order_by(desc(time_trials.c.updated_at), desc(time_trials.c.id))
+        )
+
+        async with self.engine.connect() as conn:
+            result = await conn.execute(query)
+
+        ret: list[TimeTrialData] = []
+
+        for data in result.fetchall():
+            ret.append(
+                TimeTrialData(
+                    id=data.id,
+                    user_discord_id=data.user_discord_id,
+                    track=data.track,
+                    time_ms=data.time_ms,
+                    created_at=data.created_at,
+                    updated_at=data.updated_at,
+                )
+            )
+        return ret
+
+    async def get_latest_before_24h(self, user_discord_id: str) -> dict[str, int]:
+        """直近24時間より前における各コースの直近の記録を取得する．
+
+        Parameters
+        ----------
+        user_discord_id : str
+            ユーザーのDiscord ID.
+
+        Returns
+        -------
+        dict[str, int]
+            コース(track)をキー, 直近の記録(time_ms)を値とする辞書．
+        """
+        sub_query = (
+            select(
+                time_trials.c.track,
+                func.max(time_trials.c.updated_at).label("max_updated_at"),
+            )
+            .where(
+                time_trials.c.user_discord_id == user_discord_id,
+                time_trials.c.updated_at < text("NOW() - INTERVAL 1 DAY"),
+            )
+            .group_by(time_trials.c.track)
+            .subquery()
+        )
+
+        query = (
+            select(time_trials.c.track, time_trials.c.time_ms)
+            .join(
+                sub_query,
+                tuple_(time_trials.c.track, time_trials.c.updated_at)
+                == tuple_(sub_query.c.track, sub_query.c.max_updated_at),
+            )
+            .where(time_trials.c.user_discord_id == user_discord_id)
+        )
+
+        async with self.engine.connect() as conn:
+            result = await conn.execute(query)
+
+        return {data.track: data.time_ms for data in result.fetchall()}
 
     async def get_personal_best(
         self, user_discord_id: str, track: Track
