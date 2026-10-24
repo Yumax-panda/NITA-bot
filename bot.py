@@ -63,6 +63,10 @@ class Bot(commands.Bot):
         commands = await self.tree.sync()
         logger.info(f"Successfully synced {len(commands)} commands'")
 
+    async def close(self) -> None:
+        await super().close()
+        await self.session.close()
+
     @property
     def owner(self) -> User:
         return self.bot_app_info.owner
