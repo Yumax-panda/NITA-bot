@@ -27,10 +27,6 @@ def get_repository(
     ssl_ca_path: str | None = None,
     echo: bool = False,
 ) -> Repository:
-    # f-stringでDSNを組み立てると, パスワードに"@" ":" "/"などの記号が
-    # 含まれる場合にURLのパースが壊れ, 接続先の誤認識や接続失敗を招く.
-    # URL.createは各要素を適切にパーセントエンコードしてくれるため,
-    # 認証情報に任意の文字が含まれても安全にDSNを構築できる.
     dsn = URL.create(
         "mysql+aiomysql",
         username=user,
@@ -92,15 +88,11 @@ class Repository:
                 await tx.rollback()
                 raise e
 
-    async def get_leader_board(
-        self, user_discord_ids: list[str], track: Track
-    ) -> list[TimeTrialData]:
-        """指定したユーザーの最新タイムを取得する．
+    async def get_leader_board(self, track: Track) -> list[TimeTrialData]:
+        """指定したコースの, 各ユーザーの最新タイムを取得する．
 
         Parameters
         ----------
-        user_discord_ids : list[str]
-            取得したいユーザーのdiscord ID.
         track : Track
             コース．
 
@@ -109,15 +101,19 @@ class Repository:
         list[TimeTrialData]
             タイムアタックのデータ．
         """
+        # 以前はギルドメンバー全員のIDをIN句へ展開して絞り込んでいたが,
+        # 大規模ギルドではIN句が巨大化しクエリ負荷が跳ね上がる.
+        # time_trialsテーブルはギルドを持たないため, DB側ではコースのみで
+        # 絞って各ユーザーの最新タイムを取得し, ギルドメンバーかどうかの
+        # 判定は呼び出し側(アプリ側のメンバーキャッシュ)で行う.
+        # 1つのコースに記録を持つユーザー数はギルド規模より遥かに小さいため,
+        # 全件取得してもデータ量は小さく済む.
         sub_query = (
             select(
                 time_trials.c.user_discord_id,
                 func.max(time_trials.c.created_at).label("max_created_at"),
             )
-            .where(
-                time_trials.c.user_discord_id.in_(user_discord_ids),
-                time_trials.c.track == track.id,
-            )
+            .where(time_trials.c.track == track.id)
             .group_by(time_trials.c.user_discord_id)
             .subquery()
         )
