@@ -16,9 +16,9 @@ asdfでPythonとNodejsをインストール & Poetryで依存関係をインス�
 
 ## データベース関連
 
--  DBコンテナをセットアップ(初回) `make setup-db`
--  DBコンテナを起動 `make up-db`
--  DBコンテナを停止 `make down-db`
+- DBコンテナをセットアップ(初回) `make setup-db`
+- DBコンテナを起動 `make up-db`
+- DBコンテナを停止 `make down-db`
 
 ## Botアカウントの取得
 
