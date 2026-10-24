@@ -1,4 +1,5 @@
 import logging
+import os
 
 from dependency_injector import containers, providers
 from dependency_injector.wiring import Provide, inject
@@ -7,8 +8,13 @@ from discord.utils import setup_logging
 from bot import Bot
 from repository import get_repository
 
-setup_logging()
-logging.getLogger("discord").setLevel(logging.WARN)
+# 実行環境. "dev"以外(未設定含む)は本番相当として扱う.
+# 本番でSQL全文や個人データを含むログが漏れないよう, 安全側(production)を既定とする.
+ENV = os.environ.get("ENV", "production")
+IS_DEV = ENV == "dev"
+
+setup_logging(level=logging.DEBUG if IS_DEV else logging.INFO)
+logging.getLogger("discord").setLevel(logging.WARNING)
 
 
 class Container(containers.DeclarativeContainer):
@@ -22,6 +28,8 @@ class Container(containers.DeclarativeContainer):
         port=config.db_port,
         db_name=config.db_name,
         ssl_ca_path=config.ssl_ca_path,
+        # devのときのみSQLログ(echo)を有効化する.
+        echo=config.sql_echo,
     )
 
     bot = providers.Singleton(
@@ -47,6 +55,7 @@ if __name__ == "__main__":
     container.config.db_port.from_env("DB_PORT", as_=int, default=3306)
     container.config.db_name.from_env("DB_NAME", default="mkbot")
     container.config.ssl_ca_path.from_env("SSL_CA_PATH", default=None)
+    container.config.sql_echo.from_value(IS_DEV)
     container.config.bot_token.from_env("BOT_TOKEN")
     container.config.command_prefix.from_env("COMMAND_PREFIX", default="!")
     container.config.from_yaml("./config.local.yml")
