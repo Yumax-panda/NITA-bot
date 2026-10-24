@@ -6,6 +6,7 @@ from typing import Any
 import pytest_asyncio
 from discord import app_commands
 from discord.ext import commands
+from discord.utils import MISSING
 
 from bot import Bot, extensions
 
@@ -18,13 +19,10 @@ type AnyCommand = (
 
 @pytest_asyncio.fixture
 async def bot() -> AsyncIterator[Bot]:
-    bot = Bot(bot_token="dummy", repo=None, command_prefix="!")  # type: ignore[arg-type]
+    bot = Bot(repo=MISSING, command_prefix="!")
     for extension in extensions:
         await bot.load_extension(extension)
-    try:
-        yield bot
-    finally:
-        await bot.close()
+    yield bot
 
 
 async def test_all_commands_have_description(bot: Bot) -> None:
