@@ -7,9 +7,6 @@ from discord.utils import setup_logging
 from bot import Bot
 from repository import get_repository
 
-setup_logging()
-logging.getLogger("discord").setLevel(logging.WARN)
-
 
 class Container(containers.DeclarativeContainer):
     config = providers.Configuration()
@@ -22,6 +19,7 @@ class Container(containers.DeclarativeContainer):
         port=config.db_port,
         db_name=config.db_name,
         ssl_ca_path=config.ssl_ca_path,
+        echo=config.sql_echo,
     )
 
     bot = providers.Singleton(
@@ -41,6 +39,7 @@ def main(
 
 if __name__ == "__main__":
     container = Container()
+    container.config.env.from_env("ENV", default="production")
     container.config.db_user.from_env("DB_USERNAME", default="root")
     container.config.db_password.from_env("DB_PASSWORD", default="password")
     container.config.db_hostname.from_env("DB_HOSTNAME", default="localhost")
@@ -51,6 +50,12 @@ if __name__ == "__main__":
     container.config.command_prefix.from_env("COMMAND_PREFIX", default="!")
     container.config.from_yaml("./config.local.yml")
     container.config.load()
-    container.wire(modules=[__name__])
 
+    is_dev = container.config.env() == "dev"
+    container.config.sql_echo.from_value(is_dev)
+
+    setup_logging(level=logging.DEBUG if is_dev else logging.INFO)
+    logging.getLogger("discord").setLevel(logging.WARNING)
+
+    container.wire(modules=[__name__])
     main()

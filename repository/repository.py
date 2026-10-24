@@ -4,6 +4,7 @@ import ssl
 from typing import TYPE_CHECKING
 
 from sqlalchemy import asc, desc, func, select, text, tuple_
+from sqlalchemy.engine import URL
 from sqlalchemy.ext.asyncio import create_async_engine
 
 from model.core import metadata
@@ -24,21 +25,29 @@ def get_repository(
     port: int,
     db_name: str,
     ssl_ca_path: str | None = None,
+    echo: bool = False,
 ) -> Repository:
-    dsn = f"mysql+aiomysql://{user}:{password}@{host_name}:{port}/{db_name}"
+    dsn = URL.create(
+        "mysql+aiomysql",
+        username=user,
+        password=password,
+        host=host_name,
+        port=port,
+        database=db_name,
+    )
 
     if ssl_ca_path:
         ssl_context = ssl.create_default_context(cafile=ssl_ca_path)
         engine = create_async_engine(
             dsn,
-            echo=True,
+            echo=echo,
             pool_pre_ping=True,
             connect_args={"ssl": ssl_context},
         )
     else:
         engine = create_async_engine(
             dsn,
-            echo=True,
+            echo=echo,
             pool_pre_ping=True,
         )
 
