@@ -23,9 +23,6 @@ def input_text_to_time_ms(text: str) -> int | None:
         ミリ秒へ変換されたタイム
         入力が不正な場合はNoneが返る
     """
-    # searchだと文字列中のどこかに6桁あれば先頭を採用してしまい,
-    # "abc123456"や7桁以上の誤入力を黙って受理してしまう. fullmatchで
-    # 入力全体がちょうど6桁であることを厳格に要求する.
     parsed = _TIME_INPUT_REGEX.fullmatch(text.strip())
 
     if parsed is None:
@@ -34,8 +31,6 @@ def input_text_to_time_ms(text: str) -> int | None:
     time = parsed.group(0)
     minutes, seconds, milliseconds = map(int, (time[0], time[1:3], time[3:]))
 
-    # 秒は0-59の範囲でなければタイムとして不正. この検証がないと
-    # "199999"(1分99秒)のような実在しない値を受理してしまう.
     if seconds >= 60:
         return None
 

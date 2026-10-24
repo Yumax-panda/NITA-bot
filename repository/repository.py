@@ -36,9 +36,6 @@ def get_repository(
         database=db_name,
     )
 
-    # echo=Trueは実行したSQLとバインドパラメータ(Discord IDや記録値などの
-    # 個人データを含む)を全てログへ出力するため, 本番では無効にしたい.
-    # 実行環境に応じて呼び出し側から制御できるよう引数化している.
     if ssl_ca_path:
         ssl_context = ssl.create_default_context(cafile=ssl_ca_path)
         engine = create_async_engine(

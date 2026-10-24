@@ -8,8 +8,6 @@ from discord.utils import setup_logging
 from bot import Bot
 from repository import get_repository
 
-# 実行環境. "dev"以外(未設定含む)は本番相当として扱う.
-# 本番でSQL全文や個人データを含むログが漏れないよう, 安全側(production)を既定とする.
 ENV = os.environ.get("ENV", "production")
 IS_DEV = ENV == "dev"
 
@@ -28,7 +26,6 @@ class Container(containers.DeclarativeContainer):
         port=config.db_port,
         db_name=config.db_name,
         ssl_ca_path=config.ssl_ca_path,
-        # devのときのみSQLログ(echo)を有効化する.
         echo=config.sql_echo,
     )
 
