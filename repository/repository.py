@@ -4,6 +4,7 @@ import ssl
 from typing import TYPE_CHECKING
 
 from sqlalchemy import asc, desc, func, select, text, tuple_
+from sqlalchemy.engine import URL
 from sqlalchemy.ext.asyncio import create_async_engine
 
 from model.core import metadata
@@ -25,7 +26,18 @@ def get_repository(
     db_name: str,
     ssl_ca_path: str | None = None,
 ) -> Repository:
-    dsn = f"mysql+aiomysql://{user}:{password}@{host_name}:{port}/{db_name}"
+    # f-stringでDSNを組み立てると, パスワードに"@" ":" "/"などの記号が
+    # 含まれる場合にURLのパースが壊れ, 接続先の誤認識や接続失敗を招く.
+    # URL.createは各要素を適切にパーセントエンコードしてくれるため,
+    # 認証情報に任意の文字が含まれても安全にDSNを構築できる.
+    dsn = URL.create(
+        "mysql+aiomysql",
+        username=user,
+        password=password,
+        host=host_name,
+        port=port,
+        database=db_name,
+    )
 
     if ssl_ca_path:
         ssl_context = ssl.create_default_context(cafile=ssl_ca_path)
