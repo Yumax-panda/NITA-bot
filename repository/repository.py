@@ -27,10 +27,6 @@ def get_repository(
     ssl_ca_path: str | None = None,
     echo: bool = False,
 ) -> Repository:
-    # f-stringでDSNを組み立てると, パスワードに"@" ":" "/"などの記号が
-    # 含まれる場合にURLのパースが壊れ, 接続先の誤認識や接続失敗を招く.
-    # URL.createは各要素を適切にパーセントエンコードしてくれるため,
-    # 認証情報に任意の文字が含まれても安全にDSNを構築できる.
     dsn = URL.create(
         "mysql+aiomysql",
         username=user,
