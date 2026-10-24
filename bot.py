@@ -25,13 +25,12 @@ extensions = [
 
 class Bot(commands.Bot):
     if TYPE_CHECKING:
-        _token: str
         repo: Repository
         bot_app_info: AppInfo
         owner_id: int
         session: aiohttp.ClientSession
 
-    def __init__(self, bot_token: str, repo: Repository, command_prefix: str) -> None:
+    def __init__(self, repo: Repository, command_prefix: str) -> None:
         intents = discord.Intents.default()
         intents.message_content = True
         intents.members = True
@@ -43,7 +42,6 @@ class Bot(commands.Bot):
             help_command=None,
         )
         self.repo = repo
-        self._token = bot_token
 
     async def setup_hook(self) -> None:
         self.session = aiohttp.ClientSession()
@@ -73,9 +71,6 @@ class Bot(commands.Bot):
 
     async def on_ready(self) -> None:
         logger.info(f"Logged on as {self.user}")
-
-    def run(self) -> None:
-        super().run(self._token)
 
     # TODO
     async def on_command_error(

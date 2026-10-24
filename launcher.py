@@ -26,15 +26,17 @@ class Container(containers.DeclarativeContainer):
 
     bot = providers.Singleton(
         Bot,
-        bot_token=config.bot_token,
         repo=repo,
         command_prefix=config.command_prefix,
     )
 
 
 @inject
-def main(bot: Bot = Provide[Container.bot]) -> None:
-    bot.run()
+def main(
+    bot: Bot = Provide[Container.bot],
+    token: str = Provide[Container.config.bot_token],
+) -> None:
+    bot.run(token)
 
 
 if __name__ == "__main__":
