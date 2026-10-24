@@ -139,15 +139,10 @@ class TimeTrial(GroupCog, name="NITA", description="NITA関連", group_name="nit
         if ctx.guild is None:
             return
 
-        # get_leader_boardはコースの全ユーザーの最新タイムを返す.
-        # ギルドメンバーへの絞り込みはIN句ではなくアプリ側で行う(repository参照).
-        # メンバー判定はO(1)の集合参照で済ませるため, 事前にID集合を構築する.
-        member_ids = {member.id for member in ctx.guild.members}
-        data = [
-            record
-            for record in await self.repo.get_leader_board(track=track)
-            if int(record.user_discord_id) in member_ids
-        ]
+        data = await self.repo.get_leader_board(
+            user_discord_ids=list(map(lambda m: str(m.id), ctx.guild.members)),
+            track=track,
+        )
 
         if not data:
             raise BotError(f"{track.name_ja}はまだタイムが記録されていません.")
