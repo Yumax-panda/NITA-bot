@@ -109,8 +109,22 @@ class Bot(commands.Bot):
         except discord.HTTPException:
             logger.exception("Failed to send error report to stats webhook.")
 
+    async def update_activity(self) -> None:
+        activity = discord.Activity(
+            type=discord.ActivityType.watching,
+            name=f"{len(self.guilds)} servers",
+        )
+        await self.change_presence(status=discord.Status.online, activity=activity)
+
     async def on_ready(self) -> None:
+        await self.update_activity()
         logger.info(f"Logged on as {self.user}")
+
+    async def on_guild_join(self, _: discord.Guild) -> None:
+        await self.update_activity()
+
+    async def on_guild_remove(self, _: discord.Guild) -> None:
+        await self.update_activity()
 
     async def on_error(self, event_method: str, /, *args: Any, **kwargs: Any) -> None:
         logger.exception("Unhandled exception in event %s", event_method)
