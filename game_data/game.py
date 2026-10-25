@@ -10,14 +10,14 @@ class Game(Enum):
         "mkworld",
         "マリオカートワールド",
         "Mario Kart World",
-        "World",
+        "MKWorld",
         "https://raw.githubusercontent.com/Yumax-panda/MKWorld/refs/heads/main/tracks/{id}.webp",
     )
     MK8DX = (
         "mk8dx",
-        "マリオカート8 デラックス",
+        "マリオカート8DX",
         "Mario Kart 8 Deluxe",
-        "8DX",
+        "MK8DX",
         "https://raw.githubusercontent.com/Yumax-panda/MK8DX/refs/heads/main/tracks/{id}.webp",
     )
 
