@@ -1,7 +1,9 @@
 from __future__ import annotations
 
 import logging
-from typing import TYPE_CHECKING
+import sys
+import traceback
+from typing import TYPE_CHECKING, Any
 
 import aiohttp
 import discord
@@ -17,6 +19,8 @@ if TYPE_CHECKING:
 __all__ = ("Bot",)
 
 logger = logging.getLogger(__name__)
+
+_MAX_TRACEBACK_LENGTH = 4000
 extensions = [
     "cogs.meta",
     "cogs.time_trial",
@@ -30,7 +34,12 @@ class Bot(commands.Bot):
         owner_id: int
         session: aiohttp.ClientSession
 
-    def __init__(self, repo: Repository, command_prefix: str) -> None:
+    def __init__(
+        self,
+        repo: Repository,
+        command_prefix: str,
+        stats_webhook_url: str,
+    ) -> None:
         intents = discord.Intents.default()
         intents.message_content = True
         intents.members = True
@@ -42,6 +51,7 @@ class Bot(commands.Bot):
             help_command=None,
         )
         self.repo = repo
+        self.stats_webhook_url = stats_webhook_url
 
     async def setup_hook(self) -> None:
         self.session = aiohttp.ClientSession()
@@ -69,12 +79,87 @@ class Bot(commands.Bot):
     def owner(self) -> User:
         return self.bot_app_info.owner
 
+    @discord.utils.cached_property
+    def stats_webhook(self) -> discord.Webhook:
+        return discord.Webhook.from_url(self.stats_webhook_url, session=self.session)
+
+    async def report_error(
+        self,
+        exception: BaseException,
+        *,
+        fields: dict[str, str] | None = None,
+    ) -> None:
+        tb = "".join(
+            traceback.format_exception(
+                type(exception), exception, exception.__traceback__
+            )
+        )
+        tb = tb[-_MAX_TRACEBACK_LENGTH:]
+
+        embed = discord.Embed(
+            title=f"{type(exception).__name__} Error",
+            description=f"```py\n{tb}\n```",
+            colour=discord.Color.red(),
+            timestamp=discord.utils.utcnow(),
+        )
+
+        for name, value in (fields or {}).items():
+            embed.add_field(name=name, value=value, inline=False)
+
+        try:
+            await self.stats_webhook.send(embed=embed)
+        except discord.HTTPException:
+            logger.exception("Failed to send error report to stats webhook.")
+
     async def on_ready(self) -> None:
         logger.info(f"Logged on as {self.user}")
 
-    # TODO
+    async def on_error(self, event_method: str, /, *args: Any, **kwargs: Any) -> None:
+        logger.exception("Unhandled exception in event %s", event_method)
+
+        _, exception, _ = sys.exc_info()
+
+        if exception is None:
+            return
+
+        await self.report_error(
+            exception,
+            fields={"Event": event_method},
+        )
+
     async def on_command_error(
         self, context: commands.Context[Bot], exception: commands.CommandError
     ) -> None:
         if isinstance(exception, BotError):
             await context.send(exception.message)
+            return
+
+        if isinstance(
+            exception,
+            commands.CommandNotFound
+            | commands.DisabledCommand
+            | commands.UserInputError
+            | commands.CheckFailure
+            | commands.CommandOnCooldown,
+        ):
+            return
+
+        original = getattr(exception, "original", exception)
+
+        logger.error(
+            "Unhandled exception in command %s",
+            context.command,
+            exc_info=original,
+        )
+
+        await self.report_error(
+            original,
+            fields={
+                "Command": str(context.command),
+                "User": f"{context.author} ({context.author.id})",
+                "Guild": f"{context.guild} ({context.guild.id})"
+                if context.guild
+                else "DM",
+                "Channel": f"{context.channel} ({context.channel.id})",
+            },
+        )
