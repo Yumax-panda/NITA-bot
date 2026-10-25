@@ -20,7 +20,6 @@ __all__ = ("Bot",)
 
 logger = logging.getLogger(__name__)
 
-_MAX_TRACEBACK_LENGTH = 4000
 extensions = [
     "cogs.meta",
     "cogs.time_trial",
@@ -94,7 +93,6 @@ class Bot(commands.Bot):
                 type(exception), exception, exception.__traceback__
             )
         )
-        tb = tb[-_MAX_TRACEBACK_LENGTH:]
 
         embed = discord.Embed(
             title=f"{type(exception).__name__} Error",
