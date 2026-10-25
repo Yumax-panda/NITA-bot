@@ -20,6 +20,7 @@ time_trials = Table(
     Column("id", Integer, primary_key=True, autoincrement=True),
     # discord IDは20桁以下だが，余裕を持つ
     Column("user_discord_id", VARCHAR(25), nullable=False),
+    Column("game", VARCHAR(10), nullable=False, server_default=text("'mkworld'")),
     # Track.abbrに対応, 今後のコース追加にも対応できるように長めにする．
     Column("track", VARCHAR(10), nullable=False),
     Column("time_ms", Integer, nullable=False),
@@ -38,6 +39,7 @@ time_trials = Table(
 class TimeTrialData(BaseModel):
     id: int
     user_discord_id: str
+    game: str
     track: str
     time_ms: int
     created_at: datetime

@@ -4,16 +4,19 @@ import ssl
 from typing import TYPE_CHECKING
 
 from sqlalchemy import asc, desc, func, select, text, tuple_
+from sqlalchemy.dialects.mysql import insert as mysql_insert
 from sqlalchemy.engine import URL
 from sqlalchemy.ext.asyncio import create_async_engine
 
+from game_data import Game
 from model.core import metadata
 from model.time_trials import TimeTrialData, time_trials
+from model.user_settings import user_settings
 
 if TYPE_CHECKING:
     from sqlalchemy.ext.asyncio import AsyncEngine
 
-    from mkworld.game_data.tracks import Track
+    from game_data import Track
 
 __all__ = ("get_repository", "Repository")
 
@@ -55,23 +58,40 @@ def get_repository(
 
 
 class Repository:
-    __slots__ = ("engine",)
+    __slots__ = ("engine", "_user_game_cache")
 
     if TYPE_CHECKING:
         engine: AsyncEngine
+        _user_game_cache: dict[str, Game]
 
     def __init__(self, engine: AsyncEngine) -> None:
         self.engine = engine
+        self._user_game_cache = {}
 
     async def sync(self) -> None:
         async with self.engine.begin() as conn:
             await conn.run_sync(metadata.create_all)
+            exists = await conn.execute(
+                text(
+                    "SELECT COUNT(*) FROM information_schema.columns "
+                    "WHERE table_schema = DATABASE() "
+                    "AND table_name = 'time_trials' AND column_name = 'game'"
+                )
+            )
+            if exists.scalar() == 0:
+                await conn.execute(
+                    text(
+                        "ALTER TABLE time_trials "
+                        "ADD COLUMN game VARCHAR(10) NOT NULL DEFAULT 'mkworld'"
+                    )
+                )
 
     async def create_time_trial(
         self, user_discord_id: str, track: Track, time_ms: int
     ) -> None:
         query = time_trials.insert().values(
             user_discord_id=user_discord_id,
+            game=track.game.slug,
             track=track.id,
             time_ms=time_ms,
         )
@@ -109,6 +129,7 @@ class Repository:
             )
             .where(
                 time_trials.c.user_discord_id.in_(user_discord_ids),
+                time_trials.c.game == track.game.slug,
                 time_trials.c.track == track.id,
             )
             .group_by(time_trials.c.user_discord_id)
@@ -122,26 +143,16 @@ class Repository:
                 tuple_(time_trials.c.user_discord_id, time_trials.c.created_at)
                 == tuple_(sub_query.c.user_discord_id, sub_query.c.max_created_at),
             )
-            .where(time_trials.c.track == track.id)
+            .where(
+                time_trials.c.game == track.game.slug,
+                time_trials.c.track == track.id,
+            )
         )
 
         async with self.engine.connect() as conn:
             result = await conn.execute(query)
 
-        ret: list[TimeTrialData] = []
-
-        for data in result.fetchall():
-            ret.append(
-                TimeTrialData(
-                    id=data.id,
-                    user_discord_id=data.user_discord_id,
-                    track=data.track,
-                    time_ms=data.time_ms,
-                    created_at=data.created_at,
-                    updated_at=data.updated_at,
-                )
-            )
-        return ret
+        return [self._to_time_trial(data) for data in result.fetchall()]
 
     async def get_time_trial_history(
         self, user_discord_id: str, track: Track
@@ -149,6 +160,7 @@ class Repository:
         query = (
             time_trials.select()
             .where(
+                time_trials.c.game == track.game.slug,
                 time_trials.c.track == track.id,
                 time_trials.c.user_discord_id == user_discord_id,
             )
@@ -158,20 +170,7 @@ class Repository:
         async with self.engine.connect() as conn:
             result = await conn.execute(query)
 
-        ret: list[TimeTrialData] = []
-
-        for data in result.fetchall():
-            ret.append(
-                TimeTrialData(
-                    id=data.id,
-                    user_discord_id=data.user_discord_id,
-                    track=data.track,
-                    time_ms=data.time_ms,
-                    created_at=data.created_at,
-                    updated_at=data.updated_at,
-                )
-            )
-        return ret
+        return [self._to_time_trial(data) for data in result.fetchall()]
 
     async def delete_time_trial(self, user_discord_id: str, track: Track) -> bool:
         """指定したユーザーのコースの記録を全て削除する．
@@ -190,6 +189,7 @@ class Repository:
         """
         query = time_trials.delete().where(
             time_trials.c.user_discord_id == user_discord_id,
+            time_trials.c.game == track.game.slug,
             time_trials.c.track == track.id,
         )
 
@@ -223,6 +223,7 @@ class Repository:
             time_trials.select()
             .where(
                 time_trials.c.user_discord_id == user_discord_id,
+                time_trials.c.game == track.game.slug,
                 time_trials.c.track == track.id,
             )
             .order_by(desc(time_trials.c.created_at), desc(time_trials.c.id))
@@ -243,14 +244,7 @@ class Repository:
                 )
                 await tx.commit()
 
-                return TimeTrialData(
-                    id=data.id,
-                    user_discord_id=data.user_discord_id,
-                    track=data.track,
-                    time_ms=data.time_ms,
-                    created_at=data.created_at,
-                    updated_at=data.updated_at,
-                )
+                return self._to_time_trial(data)
             except Exception as e:
                 await tx.rollback()
                 raise e
@@ -270,11 +264,12 @@ class Repository:
         """
         sub_query = (
             select(
+                time_trials.c.game,
                 time_trials.c.track,
                 func.min(time_trials.c.time_ms).label("min_time_ms"),
             )
             .where(time_trials.c.user_discord_id == user_discord_id)
-            .group_by(time_trials.c.track)
+            .group_by(time_trials.c.game, time_trials.c.track)
             .subquery()
         )
 
@@ -282,30 +277,18 @@ class Repository:
             time_trials.select()
             .join(
                 sub_query,
-                (time_trials.c.track == sub_query.c.track)
+                (time_trials.c.game == sub_query.c.game)
+                & (time_trials.c.track == sub_query.c.track)
                 & (time_trials.c.time_ms == sub_query.c.min_time_ms),
             )
             .where(time_trials.c.user_discord_id == user_discord_id)
-            .order_by(asc(time_trials.c.track))
+            .order_by(asc(time_trials.c.game), asc(time_trials.c.track))
         )
 
         async with self.engine.connect() as conn:
             result = await conn.execute(query)
 
-        ret: list[TimeTrialData] = []
-
-        for data in result.fetchall():
-            ret.append(
-                TimeTrialData(
-                    id=data.id,
-                    user_discord_id=data.user_discord_id,
-                    track=data.track,
-                    time_ms=data.time_ms,
-                    created_at=data.created_at,
-                    updated_at=data.updated_at,
-                )
-            )
-        return ret
+        return [self._to_time_trial(data) for data in result.fetchall()]
 
     async def get_recently_updated_records(
         self, user_discord_id: str
@@ -334,22 +317,11 @@ class Repository:
         async with self.engine.connect() as conn:
             result = await conn.execute(query)
 
-        ret: list[TimeTrialData] = []
+        return [self._to_time_trial(data) for data in result.fetchall()]
 
-        for data in result.fetchall():
-            ret.append(
-                TimeTrialData(
-                    id=data.id,
-                    user_discord_id=data.user_discord_id,
-                    track=data.track,
-                    time_ms=data.time_ms,
-                    created_at=data.created_at,
-                    updated_at=data.updated_at,
-                )
-            )
-        return ret
-
-    async def get_latest_before_24h(self, user_discord_id: str) -> dict[str, int]:
+    async def get_latest_before_24h(
+        self, user_discord_id: str
+    ) -> dict[tuple[str, str], int]:
         """直近24時間より前における各コースの直近の記録を取得する．
 
         Parameters
@@ -359,11 +331,12 @@ class Repository:
 
         Returns
         -------
-        dict[str, int]
-            コース(track)をキー, 直近の記録(time_ms)を値とする辞書．
+        dict[tuple[str, str], int]
+            (game, track)をキー, 直近の記録(time_ms)を値とする辞書．
         """
         sub_query = (
             select(
+                time_trials.c.game,
                 time_trials.c.track,
                 func.max(time_trials.c.updated_at).label("max_updated_at"),
             )
@@ -371,16 +344,24 @@ class Repository:
                 time_trials.c.user_discord_id == user_discord_id,
                 time_trials.c.updated_at < text("NOW() - INTERVAL 1 DAY"),
             )
-            .group_by(time_trials.c.track)
+            .group_by(time_trials.c.game, time_trials.c.track)
             .subquery()
         )
 
         query = (
-            select(time_trials.c.track, time_trials.c.time_ms)
+            select(time_trials.c.game, time_trials.c.track, time_trials.c.time_ms)
             .join(
                 sub_query,
-                tuple_(time_trials.c.track, time_trials.c.updated_at)
-                == tuple_(sub_query.c.track, sub_query.c.max_updated_at),
+                tuple_(
+                    time_trials.c.game,
+                    time_trials.c.track,
+                    time_trials.c.updated_at,
+                )
+                == tuple_(
+                    sub_query.c.game,
+                    sub_query.c.track,
+                    sub_query.c.max_updated_at,
+                ),
             )
             .where(time_trials.c.user_discord_id == user_discord_id)
         )
@@ -388,7 +369,7 @@ class Repository:
         async with self.engine.connect() as conn:
             result = await conn.execute(query)
 
-        return {data.track: data.time_ms for data in result.fetchall()}
+        return {(data.game, data.track): data.time_ms for data in result.fetchall()}
 
     async def get_personal_best(
         self, user_discord_id: str, track: Track
@@ -411,6 +392,7 @@ class Repository:
             time_trials.select()
             .where(
                 time_trials.c.user_discord_id == user_discord_id,
+                time_trials.c.game == track.game.slug,
                 time_trials.c.track == track.id,
             )
             .order_by(asc(time_trials.c.time_ms))
@@ -424,9 +406,73 @@ class Repository:
         if data is None:
             return None
 
+        return self._to_time_trial(data)
+
+    async def get_user_game(self, user_discord_id: str) -> Game:
+        """指定したユーザーが設定しているゲームを取得する．
+
+        Parameters
+        ----------
+        user_discord_id : str
+            ユーザーのDiscord ID.
+
+        Returns
+        -------
+        Game
+            設定されているゲーム．未設定の場合はGame.MKWORLD．
+        """
+        cached = self._user_game_cache.get(user_discord_id)
+        if cached is not None:
+            return cached
+
+        query = select(user_settings.c.game).where(
+            user_settings.c.user_discord_id == user_discord_id
+        )
+
+        async with self.engine.connect() as conn:
+            result = await conn.execute(query)
+            data = result.fetchone()
+
+        game = (
+            Game.MKWORLD
+            if data is None
+            else (Game.from_slug(data.game) or Game.MKWORLD)
+        )
+        self._user_game_cache[user_discord_id] = game
+        return game
+
+    async def set_user_game(self, user_discord_id: str, game: Game) -> None:
+        """指定したユーザーのゲームを設定する．
+
+        Parameters
+        ----------
+        user_discord_id : str
+            ユーザーのDiscord ID.
+        game : Game
+            設定するゲーム．
+        """
+        query = mysql_insert(user_settings).values(
+            user_discord_id=user_discord_id,
+            game=game.slug,
+        )
+        query = query.on_duplicate_key_update(game=query.inserted.game)
+
+        async with self.engine.connect() as conn, conn.begin() as tx:
+            try:
+                await conn.execute(query)
+                await tx.commit()
+            except Exception as e:
+                await tx.rollback()
+                raise e
+
+        self._user_game_cache[user_discord_id] = game
+
+    @staticmethod
+    def _to_time_trial(data) -> TimeTrialData:
         return TimeTrialData(
             id=data.id,
             user_discord_id=data.user_discord_id,
+            game=data.game,
             track=data.track,
             time_ms=data.time_ms,
             created_at=data.created_at,
