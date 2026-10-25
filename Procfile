@@ -1,1 +1,1 @@
-nita-bot: poetry run python launcher.py
+nita-bot: python launcher.py
