@@ -89,7 +89,7 @@ class Paginator(View):
         *,
         pages: list[Page],
         context: commands.Context[Bot],
-        timeout: float | None = None,
+        timeout: float | None = 180.0,
         current_page: int = 0,
     ) -> None:
         super().__init__(timeout=timeout)
