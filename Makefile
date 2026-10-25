@@ -5,7 +5,7 @@ start: # start bot
 .PHONY: fix
 fix: # fix code format
 	poetry run ruff format
-	poetry run ruff check --fix 
+	poetry run ruff check --fix
 
 .PHONY: setup
 setup: # setup tools
