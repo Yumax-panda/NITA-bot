@@ -21,14 +21,6 @@ class BaseTrack(Enum):
         return self.value[1]
 
     @property
-    def nick_en(self) -> str:
-        return self.value[2]
-
-    @property
-    def nick_ja(self) -> str:
-        return self.value[3]
-
-    @property
     def aliases(self) -> set[str]:
         return {alias.lower() for alias in self.value[4]}
 
@@ -63,9 +55,3 @@ class BaseTrack(Enum):
     def search(cls, nick: str) -> list[Self]:
         name = nick.lower()
         return [track for track in cls if any(name in alias for alias in track.aliases)]
-
-    def __str__(self) -> str:
-        return self._name_
-
-    def __bool__(self) -> bool:
-        return True
