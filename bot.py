@@ -131,17 +131,40 @@ class Bot(commands.Bot):
         self, context: commands.Context[Bot], exception: commands.CommandError
     ) -> None:
         if isinstance(exception, BotError):
-            await context.send(exception.message)
+            if exception.message:
+                await context.send(exception.message)
             return
 
-        if isinstance(
-            exception,
-            commands.CommandNotFound
-            | commands.DisabledCommand
-            | commands.UserInputError
-            | commands.CheckFailure
-            | commands.CommandOnCooldown,
-        ):
+        if isinstance(exception, commands.CommandNotFound):
+            return
+
+        if isinstance(exception, commands.UserInputError):
+            message = "入力が正しくありません."
+            command = context.command
+
+            if command is not None:
+                usage = (
+                    f"{context.clean_prefix}{command.qualified_name} "
+                    f"{command.usage or ''}"
+                ).strip()
+                message += f"\n`{usage}`"
+
+            await context.send(message)
+            return
+
+        if isinstance(exception, commands.CommandOnCooldown):
+            retry_after = f"{exception.retry_after:.1f}"
+            await context.send(
+                f"クールダウン中です. {retry_after}秒後に再試行してください."
+            )
+            return
+
+        if isinstance(exception, commands.CheckFailure):
+            await context.send("このコマンドを実行する権限がありません.")
+            return
+
+        if isinstance(exception, commands.DisabledCommand):
+            await context.send("このコマンドは現在無効化されています.")
             return
 
         original = getattr(exception, "original", exception)
@@ -152,6 +175,9 @@ class Bot(commands.Bot):
             exc_info=original,
         )
 
+        await context.send(
+            "予期しないエラーが発生しました. 時間をおいて再試行してください."
+        )
         await self.report_error(
             original,
             fields={
