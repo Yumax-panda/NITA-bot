@@ -83,7 +83,7 @@ celerybeat-schedule
 *.sage.py
 
 # Environments
-config.local.yml
+config.*.yml
 .env
 .venv
 env/
