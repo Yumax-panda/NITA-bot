@@ -26,6 +26,7 @@ class Container(containers.DeclarativeContainer):
         Bot,
         repo=repo,
         command_prefix=config.command_prefix,
+        stats_webhook_url=config.stats_webhook_url,
     )
 
 
@@ -48,6 +49,7 @@ if __name__ == "__main__":
     container.config.ssl_ca_path.from_env("SSL_CA_PATH", default=None)
     container.config.bot_token.from_env("BOT_TOKEN")
     container.config.command_prefix.from_env("COMMAND_PREFIX", default="!")
+    container.config.stats_webhook_url.from_env("STATS_WEBHOOK_URL")
     container.config.from_yaml("./config.local.yml")
     container.config.load()
 

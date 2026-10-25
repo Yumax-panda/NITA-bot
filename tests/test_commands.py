@@ -19,7 +19,7 @@ type AnyCommand = (
 
 @pytest_asyncio.fixture
 async def bot() -> AsyncIterator[Bot]:
-    bot = Bot(repo=MISSING, command_prefix="!")
+    bot = Bot(repo=MISSING, command_prefix="!", stats_webhook_url=MISSING)
     for extension in extensions:
         await bot.load_extension(extension)
     yield bot
