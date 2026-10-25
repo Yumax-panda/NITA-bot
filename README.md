@@ -1,6 +1,6 @@
 # NITA bot for Mario Kart World
 
-# 謝辞
+## 謝辞
 
 以下のプログラムを参考にさせていただきました．
 
