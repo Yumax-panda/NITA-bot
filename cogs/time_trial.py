@@ -469,6 +469,10 @@ class TimeTrial(GroupCog, name="NITA", description="NITA関連", group_name="nit
     async def fetch_wr_without_cache(
         self, track: Track
     ) -> TimeTrialResponseData | None:
+        # TODO:
+        if track.game is Game.MK8DX:
+            return None
+
         url = f"{MKC_API}/time-trials/leaderboard?game={track.game.id}&track={track.id}"
 
         async with self.bot.session.get(url) as resp:
