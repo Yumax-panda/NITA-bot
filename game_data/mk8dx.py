@@ -1062,7 +1062,16 @@ class Track(BaseTrack):
         "アテネポリス",
         "bAtD",
         "アテネ",
-        {"batd", "atd", "bada", "ada", "アテネポリス", "アテネ", "あてね", "あてねぽりす"},
+        {
+            "batd",
+            "atd",
+            "bada",
+            "ada",
+            "アテネポリス",
+            "アテネ",
+            "あてね",
+            "あてねぽりす",
+        },
     )
     bDC = (
         "Daisy Cruiser",

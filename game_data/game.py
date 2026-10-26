@@ -11,14 +11,14 @@ class Game(Enum):
         "マリオカートワールド",
         "Mario Kart World",
         "MKWorld",
-        "https://raw.githubusercontent.com/Yumax-panda/MKWorld/refs/heads/main/tracks/{id}.webp",
+        "https://raw.githubusercontent.com/Yumax-panda/MarioKart/refs/heads/main/{game}/tracks/{id}.webp",
     )
     MK8DX = (
         "mk8dx",
         "マリオカート8DX",
         "Mario Kart 8 Deluxe",
         "MK8DX",
-        "https://raw.githubusercontent.com/Yumax-panda/MK8DX/refs/heads/main/tracks/{id}.webp",
+        "https://raw.githubusercontent.com/Yumax-panda/MarioKart/refs/heads/main/{game}/tracks/{id}.png",
     )
 
     @property
@@ -38,7 +38,7 @@ class Game(Enum):
         return self.value[4]
 
     def image_url(self, track_id: str) -> str:
-        return self.image_base.format(id=track_id)
+        return self.image_base.format(game=self.id, id=track_id)
 
     @staticmethod
     def from_id(id: str) -> Game | None:
