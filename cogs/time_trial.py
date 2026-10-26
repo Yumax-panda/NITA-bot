@@ -9,17 +9,18 @@ from discord import Color, Embed, app_commands, utils
 from discord.ext import commands, tasks
 
 from error import BotError
-from mkworld.game_data.tracks import Track
+from game_data import Game, Track, track_class
 from utils.base_model import BaseModel
 from utils.time import display_time, format_time_diff
 
-from .helpers.autocomplete import query_track_autocomplete
+from .helpers.autocomplete import track_autocomplete
 from .helpers.converter import TimeMsConverter, TrackConverter
 from .helpers.paginator import EmbedPaginator, Paginator
 from .utils import GroupCog
 
 if TYPE_CHECKING:
     from bot import Bot
+    from model.time_trials import TimeTrialData
 
 MKC_API = "https://mkcentral.com/api"
 
@@ -68,7 +69,41 @@ class TimeTrial(GroupCog, name="NITA", description="NITA関連", group_name="nit
     def __init__(self, bot: Bot) -> None:
         super().__init__(bot)
         self._wr_cache = {}
-        self.cleanup_wr_cache.start()
+        self.cleanup_cache.start()
+
+    @commands.hybrid_command(
+        name="game",
+        description="使用するゲームを設定する.",
+        usage="[world|8dx]",
+    )
+    @app_commands.describe(game="world または 8dx (省略で現在の設定を表示)")
+    @app_commands.choices(
+        game=[
+            app_commands.Choice(name=Game.MKWORLD.ja, value=Game.MKWORLD.id),
+            app_commands.Choice(name=Game.MK8DX.ja, value=Game.MK8DX.id),
+        ]
+    )
+    async def set_game(
+        self, ctx: commands.Context[Bot], game: str | None = None
+    ) -> None:
+        await ctx.defer()
+        user_discord_id = str(ctx.author.id)
+
+        if game is None:
+            current = await self.repo.get_user_game(user_discord_id)
+            await ctx.send(f"現在の設定: **{current.ja}**")
+            return
+
+        parsed = Game.from_input(game)
+
+        if parsed is None:
+            raise BotError(
+                f"入力: {game}に該当するゲームが見つかりませんでした．"
+                "`world`または`8dx`を指定してください．"
+            )
+
+        await self.repo.set_user_game(user_discord_id, parsed)
+        await ctx.send(f"ゲームを**{parsed.ja}**に設定しました.")
 
     @commands.hybrid_command(
         aliases=["s"],
@@ -76,7 +111,7 @@ class TimeTrial(GroupCog, name="NITA", description="NITA関連", group_name="nit
         usage="<コース名> <タイム>",
     )
     @app_commands.describe(track="例: トロフィーシティ", time_ms="例: 140123")
-    @app_commands.autocomplete(track=query_track_autocomplete)
+    @app_commands.autocomplete(track=track_autocomplete)
     @app_commands.rename(time_ms="time")
     async def submit(
         self,
@@ -93,7 +128,7 @@ class TimeTrial(GroupCog, name="NITA", description="NITA関連", group_name="nit
         wr = await self.fetch_wr(track)
         is_pb = previous_pb is None or time_ms < previous_pb.time_ms
 
-        e = Embed(title=track.name_ja, color=Color.green())
+        e = Embed(title=track.ja, color=Color.green())
         e.set_thumbnail(url=track.image_url)
 
         input_value = f"> {display_time(time_ms)}"
@@ -127,7 +162,7 @@ class TimeTrial(GroupCog, name="NITA", description="NITA関連", group_name="nit
         usage="<コース名>",
     )
     @app_commands.describe(track="例: トロフィーシティ")
-    @app_commands.autocomplete(track=query_track_autocomplete)
+    @app_commands.autocomplete(track=track_autocomplete)
     @commands.guild_only()
     @app_commands.guild_only()
     async def ranking(
@@ -145,11 +180,11 @@ class TimeTrial(GroupCog, name="NITA", description="NITA関連", group_name="nit
         )
 
         if not data:
-            raise BotError(f"{track.name_ja}はまだタイムが記録されていません.")
+            raise BotError(f"{track.ja}はまだタイムが記録されていません.")
 
         sorted_data = sorted(data, key=lambda x: x.time_ms)
 
-        template = Embed(title=track.name, color=Color.green())
+        template = Embed(title=track.ja, color=Color.green())
         template.set_thumbnail(url=track.image_url)
         paginator = EmbedPaginator(template=template)
         wr = await self.fetch_wr(track)
@@ -171,7 +206,7 @@ class TimeTrial(GroupCog, name="NITA", description="NITA関連", group_name="nit
                 value += f" (WR {format_time_diff(diff)})"
 
             user = ctx.guild.get_member(int(record.user_discord_id))
-            user_name = user.display_name if user is not None else "N/A"
+            user_name = str(user) if user is not None else "N/A"
 
             paginator.add_field(name=f"{prefix} {user_name}", value=value, inline=False)
 
@@ -191,7 +226,7 @@ class TimeTrial(GroupCog, name="NITA", description="NITA関連", group_name="nit
         usage="<コース名>",
     )
     @app_commands.describe(track="例: トロフィーシティ")
-    @app_commands.autocomplete(track=query_track_autocomplete)
+    @app_commands.autocomplete(track=track_autocomplete)
     async def delete(
         self, ctx: commands.Context[Bot], track: Annotated[Track, TrackConverter]
     ) -> None:
@@ -203,11 +238,12 @@ class TimeTrial(GroupCog, name="NITA", description="NITA関連", group_name="nit
         )
 
         if deleted is None:
-            raise BotError(f"{track.name_ja}の記録が見つかりませんでした.")
+            raise BotError(f"{track.ja}の記録が見つかりませんでした.")
 
+        title = track.ja
         e = Embed(
             title="直近の記録を削除しました",
-            description=f"{track.name_ja}: {display_time(deleted.time_ms)}",
+            description=f"{title}: {display_time(deleted.time_ms)}",
             color=Color.red(),
         )
         e.set_thumbnail(url=track.image_url)
@@ -219,7 +255,7 @@ class TimeTrial(GroupCog, name="NITA", description="NITA関連", group_name="nit
         usage="<コース名>",
     )
     @app_commands.describe(track="例: トロフィーシティ")
-    @app_commands.autocomplete(track=query_track_autocomplete)
+    @app_commands.autocomplete(track=track_autocomplete)
     async def delete_all(
         self, ctx: commands.Context[Bot], track: Annotated[Track, TrackConverter]
     ) -> None:
@@ -231,11 +267,11 @@ class TimeTrial(GroupCog, name="NITA", description="NITA関連", group_name="nit
         )
 
         if not success:
-            raise BotError(f"{track.name_ja}の記録が見つかりませんでした.")
+            raise BotError(f"{track.ja}の記録が見つかりませんでした.")
 
         e = Embed(
             title="記録を全て削除しました",
-            description=f"{track.name_ja}の記録を全て削除しました.",
+            description=f"{track.ja}の記録を全て削除しました.",
             color=Color.red(),
         )
         e.set_thumbnail(url=track.image_url)
@@ -249,11 +285,11 @@ class TimeTrial(GroupCog, name="NITA", description="NITA関連", group_name="nit
         usage="[コース名]",
     )
     @app_commands.describe(track="例: トロフィーシティ (省略可)")
-    @app_commands.autocomplete(track=query_track_autocomplete)
+    @app_commands.autocomplete(track=track_autocomplete)
     async def profile(
         self,
         ctx: commands.Context[Bot],
-        track: Annotated[Track | None, TrackConverter] = None,
+        track: Annotated[Track, TrackConverter] | None = None,
     ) -> None:
         await ctx.defer()
         user_discord_id = str(ctx.author.id)
@@ -264,12 +300,12 @@ class TimeTrial(GroupCog, name="NITA", description="NITA関連", group_name="nit
             )
 
             if not history:
-                raise BotError(f"{track.name_ja}の記録がありません.")
+                raise BotError(f"{track.ja}の記録がありません.")
 
             pb = min(history, key=lambda x: x.time_ms)
-            e = Embed(title=track.name, color=Color.blue())
+            e = Embed(title=track.ja, color=Color.blue())
             e.set_thumbnail(url=track.image_url)
-            e.set_footer(text=f"{ctx.author.display_name}'s Record")
+            e.set_author(name=str(ctx.author), icon_url=ctx.author.display_avatar.url)
 
             pb_value = f"> {display_time(pb.time_ms)}"
             wr = await self.fetch_wr(track)
@@ -312,38 +348,56 @@ class TimeTrial(GroupCog, name="NITA", description="NITA関連", group_name="nit
             if not records:
                 raise BotError("まだ記録がありません.")
 
-            template = Embed(
-                title=f"{ctx.author.display_name}'s Records", color=Color.blue()
-            )
-            paginator = EmbedPaginator(template=template)
-
-            diff_sum_ms = 0
-            diff_count = 0
-
+            grouped: dict[Game, list[TimeTrialData]] = {}
             for record in records:
-                track_obj = Track.from_nick(record.track)
+                game = Game.from_id(record.game)
 
-                if track_obj is None:
+                if game is None:
                     continue
 
-                value = f"> {display_time(record.time_ms)}"
-                wr = await self.fetch_wr(track_obj)
+                grouped.setdefault(game, []).append(record)
 
-                if wr is not None:
-                    diff = record.time_ms - wr.time_ms
-                    diff_sum_ms += diff
-                    diff_count += 1
-                    value += f" (WR {format_time_diff(diff)})"
+            paginator = EmbedPaginator(template=Embed(color=Color.blue()))
 
-                paginator.add_field(name=track_obj.name_ja, value=value, inline=False)
-
-            if diff_count > 0:
-                avg_diff = diff_sum_ms / diff_count / 1000
-                paginator.add_field(
-                    name="Avg. Diff.",
-                    value=f"> {avg_diff:.3f} ({diff_count} tracks)",
-                    inline=False,
+            for game, game_records in grouped.items():
+                game_template = Embed(
+                    title=f"{ctx.author}'s Records",
+                    color=Color.blue(),
                 )
+                game_template.set_footer(text=game.ja)
+                paginator.change_page(game_template)
+
+                diff_sum_ms = 0
+                diff_count = 0
+
+                for record in game_records:
+                    track_obj = track_class(game).from_id(record.track)
+
+                    if track_obj is None:
+                        continue
+
+                    value = f"> {display_time(record.time_ms)}"
+                    wr = await self.fetch_wr(track_obj)
+
+                    if wr is not None:
+                        diff = record.time_ms - wr.time_ms
+                        diff_sum_ms += diff
+                        diff_count += 1
+                        value += f" (WR {format_time_diff(diff)})"
+
+                    paginator.add_field(
+                        name=track_obj.ja,
+                        value=value,
+                        inline=False,
+                    )
+
+                if diff_count > 0:
+                    avg_diff = diff_sum_ms / diff_count / 1000
+                    paginator.add_field(
+                        name="Avg. Diff.",
+                        value=f"> {avg_diff:.3f} ({diff_count} tracks)",
+                        inline=False,
+                    )
 
             await Paginator(pages=paginator.to_pages(), context=ctx).start()
 
@@ -365,57 +419,77 @@ class TimeTrial(GroupCog, name="NITA", description="NITA関連", group_name="nit
         now = datetime.now().astimezone()
         since = now - timedelta(hours=24)
 
-        template = Embed(
-            title="Daily Records",
-            description=f"{utils.format_dt(since, 's')}~{utils.format_dt(now, 's')}",
-            color=Color.green(),
-        )
-        template.set_footer(
-            text=str(ctx.author), icon_url=ctx.author.display_avatar.url
-        )
-        paginator = EmbedPaginator(template=template)
-
         latest_before = await self.repo.get_latest_before_24h(
             user_discord_id=user_discord_id
         )
 
-        grouped: dict[str, list[int]] = {}
+        grouped: dict[Game, dict[str, list[int]]] = {}
         for record in records:
-            grouped.setdefault(record.track, []).append(record.time_ms)
+            game = Game.from_id(record.game)
 
-        for track_nick, time_ms_list in grouped.items():
-            track_obj = Track.from_nick(track_nick)
-
-            if track_obj is None:
+            if game is None:
                 continue
 
-            latest = time_ms_list[0]
-            baseline = latest_before.get(track_nick)
+            grouped.setdefault(game, {}).setdefault(record.track, []).append(
+                record.time_ms
+            )
 
-            if baseline is None:
-                value = f"> {display_time(latest)} (New)"
-            else:
-                diff = format_time_diff(latest - baseline)
-                value = f"> {display_time(baseline)} -> {display_time(latest)} ({diff})"
+        period = f"{utils.format_dt(since, 's')}~{utils.format_dt(now, 's')}"
+        paginator = EmbedPaginator(template=Embed(color=Color.green()))
 
-            paginator.add_field(name=track_obj.name_ja, value=value, inline=False)
+        for game, track_map in grouped.items():
+            template = Embed(
+                title=f"{ctx.author}'s Daily Records",
+                description=period,
+                color=Color.green(),
+            )
+            template.set_footer(text=f"{game.ja}")
+            paginator.change_page(template)
+
+            for track_nick, time_ms_list in track_map.items():
+                track_obj = track_class(game).from_id(track_nick)
+
+                if track_obj is None:
+                    continue
+
+                latest = time_ms_list[0]
+                baseline = latest_before.get((game.id, track_nick))
+
+                if baseline is None:
+                    value = f"> {display_time(latest)} (New)"
+                else:
+                    diff = format_time_diff(latest - baseline)
+                    value = (
+                        f"> {display_time(baseline)} -> {display_time(latest)} ({diff})"
+                    )
+
+                paginator.add_field(
+                    name=track_obj.ja,
+                    value=value,
+                    inline=False,
+                )
 
         await Paginator(pages=paginator.to_pages(), context=ctx).start()
 
     async def fetch_wr(self, track: Track) -> TimeTrialResponseData | None:
+        key = f"{track.game.id}:{track.id}"
         try:
-            return self._wr_cache[track.abbr]
+            return self._wr_cache[key]
         except KeyError:
             wr = await self.fetch_wr_without_cache(track)
             if wr is not None:
-                self._wr_cache[track.abbr] = wr
+                self._wr_cache[key] = wr
                 return wr
         return None
 
     async def fetch_wr_without_cache(
         self, track: Track
     ) -> TimeTrialResponseData | None:
-        url = f"{MKC_API}/time-trials/leaderboard?game=mkworld&track={track.abbr}"
+        # TODO:
+        if track.game is Game.MK8DX:
+            return None
+
+        url = f"{MKC_API}/time-trials/leaderboard?game={track.game.id}&track={track.id}"
 
         async with self.bot.session.get(url) as resp:
             if resp.ok:
@@ -423,7 +497,7 @@ class TimeTrial(GroupCog, name="NITA", description="NITA関連", group_name="nit
                 data = LeaderboardResponseData.from_dict(payload)
 
                 if not data.records:
-                    logger.info(f"Track: {track.name} has no WR.")
+                    logger.info(f"Track: {track.ja} has no WR.")
                     return None
 
                 return data.records[0]
@@ -432,8 +506,9 @@ class TimeTrial(GroupCog, name="NITA", description="NITA関連", group_name="nit
                 return None
 
     @tasks.loop(hours=1.0)
-    async def cleanup_wr_cache(self) -> None:
+    async def cleanup_cache(self) -> None:
         self._wr_cache.clear()
+        self.repo.clear_game_cache()
 
 
 async def setup(bot: Bot) -> None:
