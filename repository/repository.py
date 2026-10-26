@@ -1,24 +1,44 @@
 from __future__ import annotations
 
 import ssl
+from pathlib import Path
 from typing import TYPE_CHECKING
 
-from sqlalchemy import asc, desc, func, select, text, tuple_
+from alembic import command
+from alembic.config import Config
+from sqlalchemy import asc, desc, func, inspect, select, text, tuple_
 from sqlalchemy.dialects.mysql import insert as mysql_insert
 from sqlalchemy.engine import URL
 from sqlalchemy.ext.asyncio import create_async_engine
 
 from game_data import Game
-from model.core import metadata
 from model.time_trials import TimeTrialData, time_trials
 from model.user_settings import user_settings
 
 if TYPE_CHECKING:
+    from sqlalchemy.engine import Connection
     from sqlalchemy.ext.asyncio import AsyncEngine
 
     from game_data import Track
 
 __all__ = ("get_repository", "Repository")
+
+_ROOT = Path(__file__).resolve().parent.parent
+
+
+def _alembic_config(connection: Connection) -> Config:
+    cfg = Config(str(_ROOT / "alembic.ini"))
+    cfg.set_main_option("script_location", str(_ROOT / "migrations"))
+    cfg.attributes["connection"] = connection
+    return cfg
+
+
+def _has_version_table(connection: Connection) -> bool:
+    return inspect(connection).has_table("alembic_version")
+
+
+def _run_upgrade(connection: Connection) -> None:
+    command.upgrade(_alembic_config(connection), "head")
 
 
 def get_repository(
@@ -68,23 +88,18 @@ class Repository:
         self.engine = engine
         self._game_cache = {}
 
-    async def sync(self) -> None:
+    async def migrate(self) -> bool:
+        """未適用のマイグレーションを全て適用する．
+
+        Returns
+        -------
+        bool
+            マイグレーション履歴が存在せず, 新規に初期化された場合True．
+        """
         async with self.engine.begin() as conn:
-            await conn.run_sync(metadata.create_all)
-            exists = await conn.execute(
-                text(
-                    "SELECT COUNT(*) FROM information_schema.columns "
-                    "WHERE table_schema = DATABASE() "
-                    "AND table_name = 'time_trials' AND column_name = 'game'"
-                )
-            )
-            if exists.scalar() == 0:
-                await conn.execute(
-                    text(
-                        "ALTER TABLE time_trials "
-                        "ADD COLUMN game VARCHAR(10) NOT NULL DEFAULT 'mkworld'"
-                    )
-                )
+            is_fresh = not await conn.run_sync(_has_version_table)
+            await conn.run_sync(_run_upgrade)
+            return is_fresh
 
     async def create_time_trial(
         self, user_discord_id: str, track: Track, time_ms: int

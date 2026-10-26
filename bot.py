@@ -64,7 +64,9 @@ class Bot(commands.Bot):
         self.bot_app_info = await self.application_info()
         self.owner_id = self.bot_app_info.owner.id
 
-        await self.repo.sync()
+        init = await self.repo.migrate()
+        if init:
+            logger.info("Database schema was freshly initialized.")
         logger.info("Repository is ready.")
 
         commands = await self.tree.sync()
