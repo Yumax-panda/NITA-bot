@@ -68,7 +68,7 @@ class TimeTrial(GroupCog, name="NITA", description="NITA関連", group_name="nit
     def __init__(self, bot: Bot) -> None:
         super().__init__(bot)
         self._wr_cache = {}
-        self.cleanup_wr_cache.start()
+        self.cleanup_cache.start()
 
     @commands.hybrid_command(
         name="game",
@@ -486,8 +486,9 @@ class TimeTrial(GroupCog, name="NITA", description="NITA関連", group_name="nit
                 return None
 
     @tasks.loop(hours=1.0)
-    async def cleanup_wr_cache(self) -> None:
+    async def cleanup_cache(self) -> None:
         self._wr_cache.clear()
+        self.repo.clear_game_cache()
 
 
 async def setup(bot: Bot) -> None:

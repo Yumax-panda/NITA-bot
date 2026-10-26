@@ -58,13 +58,15 @@ def get_repository(
 
 
 class Repository:
-    __slots__ = ("engine",)
+    __slots__ = ("engine", "_game_cache")
 
     if TYPE_CHECKING:
         engine: AsyncEngine
+        _game_cache: dict[str, Game]
 
     def __init__(self, engine: AsyncEngine) -> None:
         self.engine = engine
+        self._game_cache = {}
 
     async def sync(self) -> None:
         async with self.engine.begin() as conn:
@@ -409,6 +411,8 @@ class Repository:
     async def get_user_game(self, user_discord_id: str) -> Game:
         """指定したユーザーが設定しているゲームを取得する．
 
+        取得した結果はメモリ上にキャッシュされる．
+
         Parameters
         ----------
         user_discord_id : str
@@ -419,6 +423,10 @@ class Repository:
         Game
             設定されているゲーム．未設定の場合はGame.MKWORLD．
         """
+        cached = self._game_cache.get(user_discord_id)
+        if cached is not None:
+            return cached
+
         query = select(user_settings.c.game).where(
             user_settings.c.user_discord_id == user_discord_id
         )
@@ -427,12 +435,16 @@ class Repository:
             result = await conn.execute(query)
             data = result.fetchone()
 
-        return (
+        game = (
             Game.MKWORLD if data is None else (Game.from_id(data.game) or Game.MKWORLD)
         )
+        self._game_cache[user_discord_id] = game
+        return game
 
     async def set_user_game(self, user_discord_id: str, game: Game) -> None:
         """指定したユーザーのゲームを設定する．
+
+        設定後，get_user_game用のキャッシュも新しい値で更新する．
 
         Parameters
         ----------
@@ -454,6 +466,12 @@ class Repository:
             except Exception as e:
                 await tx.rollback()
                 raise e
+
+        self._game_cache[user_discord_id] = game
+
+    def clear_game_cache(self) -> None:
+        """キャッシュされているユーザーのゲーム設定を全て削除する．"""
+        self._game_cache.clear()
 
     @staticmethod
     def _to_time_trial(data) -> TimeTrialData:

@@ -2,6 +2,7 @@ from __future__ import annotations
 
 from collections.abc import AsyncIterator
 from typing import Any
+from unittest.mock import MagicMock
 
 import pytest_asyncio
 from discord import app_commands
@@ -9,6 +10,7 @@ from discord.ext import commands
 from discord.utils import MISSING
 
 from bot import Bot, extensions
+from repository import Repository
 
 type AnyCommand = (
     commands.Command[Any, ..., Any]
@@ -19,7 +21,11 @@ type AnyCommand = (
 
 @pytest_asyncio.fixture
 async def bot() -> AsyncIterator[Bot]:
-    bot = Bot(repo=MISSING, command_prefix="!", stats_webhook_url=MISSING)
+    bot = Bot(
+        repo=MagicMock(spec=Repository),
+        command_prefix="!",
+        stats_webhook_url=MISSING,
+    )
     for extension in extensions:
         await bot.load_extension(extension)
     yield bot
