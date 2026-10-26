@@ -1,5 +1,6 @@
 import asyncio
 import os
+import ssl
 from logging.config import fileConfig
 
 from alembic import context
@@ -31,6 +32,22 @@ def _build_engine():
     if url:
         # mysql:// や mysql+pymysql:// で渡されてもaiomysqlドライバに揃える．
         url = make_url(url).set(drivername="mysql+aiomysql")
+
+        # aiomysqlはURLクエリのssl_caを解釈できない(dictのまま渡りwrap_bioで落ちる)．
+        # クエリや環境変数からCAパスを取り出し, SSLContextにしてconnect_argsで渡す．
+        query = dict(url.query)
+        ssl_ca = query.pop("ssl_ca", None)
+        url = url.set(query=query)
+
+        ssl_ca_path = (ssl_ca[0] if isinstance(ssl_ca, tuple) else ssl_ca) or (
+            os.environ.get("SSL_CA_PATH")
+        )
+
+        if ssl_ca_path:
+            ssl_context = ssl.create_default_context(cafile=ssl_ca_path)
+            return create_async_engine(
+                url, pool_pre_ping=True, connect_args={"ssl": ssl_context}
+            )
         return create_async_engine(url, pool_pre_ping=True)
 
     return get_repository(
