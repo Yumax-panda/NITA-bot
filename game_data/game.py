@@ -22,16 +22,12 @@ class Game(Enum):
     )
 
     @property
-    def slug(self) -> str:
+    def id(self) -> str:
         return self.value[0]
 
     @property
     def ja(self) -> str:
         return self.value[1]
-
-    @property
-    def en(self) -> str:
-        return self.value[2]
 
     @property
     def short(self) -> str:
@@ -45,27 +41,20 @@ class Game(Enum):
         return self.image_base.format(id=track_id)
 
     @staticmethod
-    def from_slug(slug: str) -> Game | None:
+    def from_id(id: str) -> Game | None:
         for game in Game:
-            if game.slug == slug:
+            if game.id == id:
                 return game
         return None
 
     @staticmethod
     def from_input(text: str) -> Game | None:
         key = text.lower().strip()
-        mapping = {
-            "mkworld": Game.MKWORLD,
-            "world": Game.MKWORLD,
-            "mkw": Game.MKWORLD,
-            "w": Game.MKWORLD,
-            "ワールド": Game.MKWORLD,
-            "mk8dx": Game.MK8DX,
-            "8dx": Game.MK8DX,
-            "8": Game.MK8DX,
-            "mk8": Game.MK8DX,
-            "deluxe": Game.MK8DX,
-            "dx": Game.MK8DX,
-            "デラックス": Game.MK8DX,
+        aliases = {
+            Game.MKWORLD: ("mkworld", "world", "mkw", "w", "ワールド"),
+            Game.MK8DX: ("mk8dx", "8dx", "8", "mk8", "deluxe", "dx", "デラックス"),
         }
-        return mapping.get(key)
+        for game, keys in aliases.items():
+            if key in keys:
+                return game
+        return None
