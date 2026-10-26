@@ -193,7 +193,7 @@ class TimeTrial(GroupCog, name="NITA", description="NITA関連", group_name="nit
 
         sorted_data = sorted(data, key=lambda x: x.time_ms)
 
-        template = Embed(title=track.en, color=Color.green())
+        template = Embed(title=track.ja, color=Color.green())
         template.set_thumbnail(url=track.image_url)
         paginator = EmbedPaginator(template=template)
         wr = await self.fetch_wr(track)
@@ -312,7 +312,7 @@ class TimeTrial(GroupCog, name="NITA", description="NITA関連", group_name="nit
                 raise BotError(f"{track.ja}の記録がありません.")
 
             pb = min(history, key=lambda x: x.time_ms)
-            e = Embed(title=track.en, color=Color.blue())
+            e = Embed(title=track.ja, color=Color.blue())
             e.set_thumbnail(url=track.image_url)
             e.set_footer(text=f"{ctx.author.display_name}'s Record")
 
@@ -487,7 +487,7 @@ class TimeTrial(GroupCog, name="NITA", description="NITA関連", group_name="nit
                 data = LeaderboardResponseData.from_dict(payload)
 
                 if not data.records:
-                    logger.info(f"Track: {track.en} has no WR.")
+                    logger.info(f"Track: {track.ja} has no WR.")
                     return None
 
                 return data.records[0]
