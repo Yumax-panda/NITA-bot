@@ -33,3 +33,24 @@ down-db:
 .PHONY: test
 test:
 	poetry run pytest
+
+.PHONY: migrate
+migrate: # create a new revision from model diff (make migrate m="reason")
+	poetry run alembic revision --autogenerate -m "$(m)"
+
+.PHONY: upgrade
+upgrade: # apply pending migrations
+	poetry run alembic upgrade head
+
+.PHONY: stamp
+stamp: # mark DB as already at head without running DDL (make stamp url="mysql://user:pass@host:port/db")
+	poetry run alembic $(if $(url),-x db_url="$(url)") stamp head
+
+.PHONY: downgrade
+downgrade: # revert the last migration
+	poetry run alembic downgrade -1
+
+.PHONY: migrate-history
+migrate-history: # show revision history and current version
+	poetry run alembic history
+	poetry run alembic current
