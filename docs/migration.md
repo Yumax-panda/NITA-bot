@@ -31,7 +31,7 @@
 - `make <target> url="mysql://user:pass@host:port/db"` のように `url` を渡す(内部で `alembic -x db_url=...` に変換される)。
 - もしくは `DATABASE_URL` 環境変数に接続文字列を設定する。
 - ドライバ指定(`mysql+aiomysql` など)は自動で `aiomysql` に揃うため、`mysql://` 形式でよい。
-- TiDB Cloud のようにSSLが必要な場合はクエリで `?ssl_ca=/path/to/ca.pem` を付ける。
+- TiDB Cloud のようにSSLが必要な場合は、CA証明書のパスを指定する。クエリ `?ssl_ca=/path/to/ca.pem` か、`SSL_CA_PATH` 環境変数のどちらでもよい。指定されたパスから `SSLContext` を構築して接続に用いる(aiomysqlはクエリの `ssl_ca` を直接解釈できないため、`env.py` 側で変換している)。
 
 例(本番TiDBを `head` 適用済みとしてスタンプする):
 
