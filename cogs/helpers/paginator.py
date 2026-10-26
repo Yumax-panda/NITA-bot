@@ -28,10 +28,15 @@ if TYPE_CHECKING:
         value: str
         inline: bool
 
+    class EmbedSection(TypedDict):
+        template: Embed
+        fields: list[EmbedField]
+
 else:
     PaginatorStartKwargs = dict
     PaginatorEditKwargs = dict
     EmbedField = dict
+    EmbedSection = dict
 
 __all__ = (
     "Page",
@@ -195,31 +200,52 @@ class Paginator(View):
 
 class EmbedPaginator:
     __slots__ = (
-        "fields",
+        "sections",
         "template",
     )
 
     if TYPE_CHECKING:
-        fields: list[EmbedField]
+        sections: list[EmbedSection]
         template: Embed
 
     def __init__(self, template: Embed) -> None:
         self.template = template
-        self.fields = []
+        self.sections = [{"template": template, "fields": []}]
 
     def add_field(self, name: str, value: str, inline: bool) -> None:
-        self.fields.append({"name": name, "value": value, "inline": inline})
+        self.sections[-1]["fields"].append(
+            {"name": name, "value": value, "inline": inline}
+        )
+
+    def change_page(self, template: Embed | None = None) -> None:
+        """以降に追加するフィールドを新しいページから開始する.
+
+        template を指定すると, そのページ以降は指定したテンプレートを使う.
+        省略した場合は直前のセクションのテンプレートを引き継ぐ.
+        """
+        self.sections.append(
+            {
+                "template": template or self.sections[-1]["template"],
+                "fields": [],
+            }
+        )
 
     def to_pages(self) -> list[Page]:
         MAX_FIELDS = 25
         pages: list[Page] = []
 
-        for i in range(0, len(self.fields), MAX_FIELDS):
-            e = self.template.copy()
+        for section in self.sections:
+            fields = section["fields"]
 
-            for field in self.fields[i : i + MAX_FIELDS]:
-                e.add_field(**field)
+            if not fields:
+                continue
 
-            pages.append(Page(embed=e))
+            for i in range(0, len(fields), MAX_FIELDS):
+                e = section["template"].copy()
+
+                for field in fields[i : i + MAX_FIELDS]:
+                    e.add_field(**field)
+
+                pages.append(Page(embed=e))
 
         return pages

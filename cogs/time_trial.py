@@ -20,6 +20,7 @@ from .utils import GroupCog
 
 if TYPE_CHECKING:
     from bot import Bot
+    from model.time_trials import TimeTrialData
 
 MKC_API = "https://mkcentral.com/api"
 
@@ -205,7 +206,7 @@ class TimeTrial(GroupCog, name="NITA", description="NITA関連", group_name="nit
                 value += f" (WR {format_time_diff(diff)})"
 
             user = ctx.guild.get_member(int(record.user_discord_id))
-            user_name = user.display_name if user is not None else "N/A"
+            user_name = str(user) if user is not None else "N/A"
 
             paginator.add_field(name=f"{prefix} {user_name}", value=value, inline=False)
 
@@ -304,7 +305,7 @@ class TimeTrial(GroupCog, name="NITA", description="NITA関連", group_name="nit
             pb = min(history, key=lambda x: x.time_ms)
             e = Embed(title=track.ja, color=Color.blue())
             e.set_thumbnail(url=track.image_url)
-            e.set_footer(text=f"{ctx.author.display_name}'s Record")
+            e.set_author(name=str(ctx.author), icon_url=ctx.author.display_avatar.url)
 
             pb_value = f"> {display_time(pb.time_ms)}"
             wr = await self.fetch_wr(track)
@@ -347,47 +348,56 @@ class TimeTrial(GroupCog, name="NITA", description="NITA関連", group_name="nit
             if not records:
                 raise BotError("まだ記録がありません.")
 
-            template = Embed(
-                title=f"{ctx.author.display_name}'s Records", color=Color.blue()
-            )
-            paginator = EmbedPaginator(template=template)
-
-            diff_sum_ms = 0
-            diff_count = 0
-
+            grouped: dict[Game, list[TimeTrialData]] = {}
             for record in records:
                 game = Game.from_id(record.game)
 
                 if game is None:
                     continue
 
-                track_obj = track_class(game).from_id(record.track)
+                grouped.setdefault(game, []).append(record)
 
-                if track_obj is None:
-                    continue
+            paginator = EmbedPaginator(template=Embed(color=Color.blue()))
 
-                value = f"> {display_time(record.time_ms)}"
-                wr = await self.fetch_wr(track_obj)
-
-                if wr is not None:
-                    diff = record.time_ms - wr.time_ms
-                    diff_sum_ms += diff
-                    diff_count += 1
-                    value += f" (WR {format_time_diff(diff)})"
-
-                paginator.add_field(
-                    name=track_obj.ja,
-                    value=value,
-                    inline=False,
+            for game, game_records in grouped.items():
+                game_template = Embed(
+                    title=f"{ctx.author}'s Records",
+                    color=Color.blue(),
                 )
+                game_template.set_footer(text=game.ja)
+                paginator.change_page(game_template)
 
-            if diff_count > 0:
-                avg_diff = diff_sum_ms / diff_count / 1000
-                paginator.add_field(
-                    name="Avg. Diff.",
-                    value=f"> {avg_diff:.3f} ({diff_count} tracks)",
-                    inline=False,
-                )
+                diff_sum_ms = 0
+                diff_count = 0
+
+                for record in game_records:
+                    track_obj = track_class(game).from_id(record.track)
+
+                    if track_obj is None:
+                        continue
+
+                    value = f"> {display_time(record.time_ms)}"
+                    wr = await self.fetch_wr(track_obj)
+
+                    if wr is not None:
+                        diff = record.time_ms - wr.time_ms
+                        diff_sum_ms += diff
+                        diff_count += 1
+                        value += f" (WR {format_time_diff(diff)})"
+
+                    paginator.add_field(
+                        name=track_obj.ja,
+                        value=value,
+                        inline=False,
+                    )
+
+                if diff_count > 0:
+                    avg_diff = diff_sum_ms / diff_count / 1000
+                    paginator.add_field(
+                        name="Avg. Diff.",
+                        value=f"> {avg_diff:.3f} ({diff_count} tracks)",
+                        inline=False,
+                    )
 
             await Paginator(pages=paginator.to_pages(), context=ctx).start()
 
@@ -409,49 +419,55 @@ class TimeTrial(GroupCog, name="NITA", description="NITA関連", group_name="nit
         now = datetime.now().astimezone()
         since = now - timedelta(hours=24)
 
-        template = Embed(
-            title="Daily Records",
-            description=f"{utils.format_dt(since, 's')}~{utils.format_dt(now, 's')}",
-            color=Color.green(),
-        )
-        template.set_footer(
-            text=str(ctx.author), icon_url=ctx.author.display_avatar.url
-        )
-        paginator = EmbedPaginator(template=template)
-
         latest_before = await self.repo.get_latest_before_24h(
             user_discord_id=user_discord_id
         )
 
-        grouped: dict[tuple[str, str], list[int]] = {}
+        grouped: dict[Game, dict[str, list[int]]] = {}
         for record in records:
-            grouped.setdefault((record.game, record.track), []).append(record.time_ms)
-
-        for (game_slug, track_nick), time_ms_list in grouped.items():
-            game = Game.from_id(game_slug)
+            game = Game.from_id(record.game)
 
             if game is None:
                 continue
 
-            track_obj = track_class(game).from_id(track_nick)
-
-            if track_obj is None:
-                continue
-
-            latest = time_ms_list[0]
-            baseline = latest_before.get((game_slug, track_nick))
-
-            if baseline is None:
-                value = f"> {display_time(latest)} (New)"
-            else:
-                diff = format_time_diff(latest - baseline)
-                value = f"> {display_time(baseline)} -> {display_time(latest)} ({diff})"
-
-            paginator.add_field(
-                name=track_obj.ja,
-                value=value,
-                inline=False,
+            grouped.setdefault(game, {}).setdefault(record.track, []).append(
+                record.time_ms
             )
+
+        period = f"{utils.format_dt(since, 's')}~{utils.format_dt(now, 's')}"
+        paginator = EmbedPaginator(template=Embed(color=Color.green()))
+
+        for game, track_map in grouped.items():
+            template = Embed(
+                title=f"{ctx.author}'s Daily Records",
+                description=period,
+                color=Color.green(),
+            )
+            template.set_footer(text=f"{game.ja}")
+            paginator.change_page(template)
+
+            for track_nick, time_ms_list in track_map.items():
+                track_obj = track_class(game).from_id(track_nick)
+
+                if track_obj is None:
+                    continue
+
+                latest = time_ms_list[0]
+                baseline = latest_before.get((game.id, track_nick))
+
+                if baseline is None:
+                    value = f"> {display_time(latest)} (New)"
+                else:
+                    diff = format_time_diff(latest - baseline)
+                    value = (
+                        f"> {display_time(baseline)} -> {display_time(latest)} ({diff})"
+                    )
+
+                paginator.add_field(
+                    name=track_obj.ja,
+                    value=value,
+                    inline=False,
+                )
 
         await Paginator(pages=paginator.to_pages(), context=ctx).start()
 
