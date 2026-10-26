@@ -20,7 +20,7 @@ class TrackConverter(commands.Converter["Track"]):
         track = cls.from_id(argument) or cls.from_nick(argument)
 
         if track is None:
-            raise BotError(f"入力: {argument}に該当するコースが見つかりませんでした．")
+            raise BotError(f"入力: {argument}に該当するコースが{game.ja}では見つかりませんでした．")
 
         return track
 
