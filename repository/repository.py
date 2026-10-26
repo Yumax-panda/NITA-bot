@@ -58,15 +58,13 @@ def get_repository(
 
 
 class Repository:
-    __slots__ = ("engine", "_user_game_cache")
+    __slots__ = ("engine",)
 
     if TYPE_CHECKING:
         engine: AsyncEngine
-        _user_game_cache: dict[str, Game]
 
     def __init__(self, engine: AsyncEngine) -> None:
         self.engine = engine
-        self._user_game_cache = {}
 
     async def sync(self) -> None:
         async with self.engine.begin() as conn:
@@ -91,7 +89,7 @@ class Repository:
     ) -> None:
         query = time_trials.insert().values(
             user_discord_id=user_discord_id,
-            game=track.game.slug,
+            game=track.game.id,
             track=track.id,
             time_ms=time_ms,
         )
@@ -129,7 +127,7 @@ class Repository:
             )
             .where(
                 time_trials.c.user_discord_id.in_(user_discord_ids),
-                time_trials.c.game == track.game.slug,
+                time_trials.c.game == track.game.id,
                 time_trials.c.track == track.id,
             )
             .group_by(time_trials.c.user_discord_id)
@@ -144,7 +142,7 @@ class Repository:
                 == tuple_(sub_query.c.user_discord_id, sub_query.c.max_created_at),
             )
             .where(
-                time_trials.c.game == track.game.slug,
+                time_trials.c.game == track.game.id,
                 time_trials.c.track == track.id,
             )
         )
@@ -160,7 +158,7 @@ class Repository:
         query = (
             time_trials.select()
             .where(
-                time_trials.c.game == track.game.slug,
+                time_trials.c.game == track.game.id,
                 time_trials.c.track == track.id,
                 time_trials.c.user_discord_id == user_discord_id,
             )
@@ -189,7 +187,7 @@ class Repository:
         """
         query = time_trials.delete().where(
             time_trials.c.user_discord_id == user_discord_id,
-            time_trials.c.game == track.game.slug,
+            time_trials.c.game == track.game.id,
             time_trials.c.track == track.id,
         )
 
@@ -223,7 +221,7 @@ class Repository:
             time_trials.select()
             .where(
                 time_trials.c.user_discord_id == user_discord_id,
-                time_trials.c.game == track.game.slug,
+                time_trials.c.game == track.game.id,
                 time_trials.c.track == track.id,
             )
             .order_by(desc(time_trials.c.created_at), desc(time_trials.c.id))
@@ -392,7 +390,7 @@ class Repository:
             time_trials.select()
             .where(
                 time_trials.c.user_discord_id == user_discord_id,
-                time_trials.c.game == track.game.slug,
+                time_trials.c.game == track.game.id,
                 time_trials.c.track == track.id,
             )
             .order_by(asc(time_trials.c.time_ms))
@@ -421,10 +419,6 @@ class Repository:
         Game
             設定されているゲーム．未設定の場合はGame.MKWORLD．
         """
-        cached = self._user_game_cache.get(user_discord_id)
-        if cached is not None:
-            return cached
-
         query = select(user_settings.c.game).where(
             user_settings.c.user_discord_id == user_discord_id
         )
@@ -433,13 +427,9 @@ class Repository:
             result = await conn.execute(query)
             data = result.fetchone()
 
-        game = (
-            Game.MKWORLD
-            if data is None
-            else (Game.from_slug(data.game) or Game.MKWORLD)
+        return (
+            Game.MKWORLD if data is None else (Game.from_id(data.game) or Game.MKWORLD)
         )
-        self._user_game_cache[user_discord_id] = game
-        return game
 
     async def set_user_game(self, user_discord_id: str, game: Game) -> None:
         """指定したユーザーのゲームを設定する．
@@ -453,7 +443,7 @@ class Repository:
         """
         query = mysql_insert(user_settings).values(
             user_discord_id=user_discord_id,
-            game=game.slug,
+            game=game.id,
         )
         query = query.on_duplicate_key_update(game=query.inserted.game)
 
@@ -464,8 +454,6 @@ class Repository:
             except Exception as e:
                 await tx.rollback()
                 raise e
-
-        self._user_game_cache[user_discord_id] = game
 
     @staticmethod
     def _to_time_trial(data) -> TimeTrialData:
