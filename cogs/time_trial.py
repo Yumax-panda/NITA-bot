@@ -90,12 +90,7 @@ class TimeTrial(GroupCog, name="NITA", description="NITA関連", group_name="nit
 
         if game is None:
             current = await self.repo.get_user_game(user_discord_id)
-            e = Embed(
-                title="ゲーム設定",
-                description=f"現在のゲーム: **{current.ja}**",
-                color=Color.blue(),
-            )
-            await ctx.send(embed=e)
+            await ctx.send(f"現在の設定: **{current.ja}**")
             return
 
         parsed = Game.from_input(game)
@@ -107,12 +102,7 @@ class TimeTrial(GroupCog, name="NITA", description="NITA関連", group_name="nit
             )
 
         await self.repo.set_user_game(user_discord_id, parsed)
-        e = Embed(
-            title="ゲーム設定",
-            description=f"ゲームを**{parsed.ja}**に設定しました.",
-            color=Color.green(),
-        )
-        await ctx.send(embed=e)
+        await ctx.send(f"ゲームを**{parsed.ja}**に設定しました.")
 
     @commands.hybrid_command(
         aliases=["s"],
