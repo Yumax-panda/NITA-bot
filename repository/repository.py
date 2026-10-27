@@ -21,14 +21,16 @@ if TYPE_CHECKING:
 
     from game_data import Track
 
-__all__ = ("get_repository", "Repository")
-
-_ROOT = Path(__file__).resolve().parent.parent
+__all__ = (
+    "get_repository",
+    "Repository",
+)
 
 
 def _alembic_config(connection: Connection) -> Config:
-    cfg = Config(str(_ROOT / "alembic.ini"))
-    cfg.set_main_option("script_location", str(_ROOT / "migrations"))
+    root = Path(__file__).resolve().parent.parent
+    cfg = Config(str(root / "alembic.ini"))
+    cfg.set_main_option("script_location", str(root / "migrations"))
     cfg.attributes["connection"] = connection
     return cfg
 

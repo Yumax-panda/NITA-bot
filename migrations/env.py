@@ -32,9 +32,6 @@ def _build_engine():
     if url:
         # mysql:// や mysql+pymysql:// で渡されてもaiomysqlドライバに揃える．
         url = make_url(url).set(drivername="mysql+aiomysql")
-
-        # aiomysqlはURLクエリのssl_caを解釈できない(dictのまま渡りwrap_bioで落ちる)．
-        # クエリや環境変数からCAパスを取り出し, SSLContextにしてconnect_argsで渡す．
         query = dict(url.query)
         ssl_ca = query.pop("ssl_ca", None)
         url = url.set(query=query)
@@ -95,8 +92,6 @@ async def run_async_migrations() -> None:
 
 
 def run_migrations_online() -> None:
-    # アプリ起動時はrepository側から既存の接続が渡される．
-    # CLI(alembicコマンド)実行時は環境変数からエンジンを構築する．
     connection = config.attributes.get("connection", None)
     if connection is not None:
         do_run_migrations(connection)
