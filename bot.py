@@ -54,7 +54,7 @@ class Bot(commands.Bot):
         self.stats_webhook_url = stats_webhook_url
 
     async def setup_hook(self) -> None:
-        self.session = aiohttp.ClientSession()
+        self.session = aiohttp.ClientSession(timeout=aiohttp.ClientTimeout(total=10))
 
         for extension in extensions:
             try:

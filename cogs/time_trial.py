@@ -5,6 +5,7 @@ from dataclasses import dataclass
 from datetime import datetime, timedelta
 from typing import TYPE_CHECKING, Annotated
 
+import aiohttp
 from discord import Color, Embed, app_commands, utils
 from discord.ext import commands, tasks
 
@@ -489,21 +490,27 @@ class TimeTrial(GroupCog, name="NITA", description="NITA関連", group_name="nit
         if track.game is Game.MK8DX:
             return None
 
-        url = f"{MKC_API}/time-trials/leaderboard?game={track.game.id}&track={track.id}"
+        url = f"{MKC_API}/time-trials/leaderboard"
+        params = {"game": track.game.id, "track": track.id}
 
-        async with self.bot.session.get(url) as resp:
-            if resp.ok:
-                payload = await resp.json()
-                data = LeaderboardResponseData.from_dict(payload)
-
-                if not data.records:
-                    logger.info(f"Track: {track.ja} has no WR.")
+        try:
+            async with self.bot.session.get(url, params=params) as resp:
+                if not resp.ok:
+                    logger.error(f"API {url}(GET) returned {resp.status}.")
                     return None
 
-                return data.records[0]
-            else:
-                logger.error(f"API {url}(GET) returned {resp.status}.")
-                return None
+                payload = await resp.json()
+        except (aiohttp.ClientError, TimeoutError):
+            logger.exception(f"API {url}(GET) request failed.")
+            return None
+
+        data = LeaderboardResponseData.from_dict(payload)
+
+        if not data.records:
+            logger.info(f"Track: {track.ja} has no WR.")
+            return None
+
+        return data.records[0]
 
     @tasks.loop(hours=1.0)
     async def cleanup_cache(self) -> None:
