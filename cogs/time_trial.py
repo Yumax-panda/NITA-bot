@@ -489,9 +489,10 @@ class TimeTrial(GroupCog, name="NITA", description="NITA関連", group_name="nit
         if track.game is Game.MK8DX:
             return None
 
-        url = f"{MKC_API}/time-trials/leaderboard?game={track.game.id}&track={track.id}"
+        url = f"{MKC_API}/time-trials/leaderboard"
+        params = {"game": track.game.id, "track": track.id}
 
-        async with self.bot.session.get(url) as resp:
+        async with self.bot.session.get(url, params=params) as resp:
             if resp.ok:
                 payload = await resp.json()
                 data = LeaderboardResponseData.from_dict(payload)
