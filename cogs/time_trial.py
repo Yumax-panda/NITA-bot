@@ -17,7 +17,7 @@ from utils.time import display_time, format_time_diff
 from .helpers.autocomplete import track_autocomplete
 from .helpers.converter import TimeMsConverter, TrackConverter
 from .helpers.paginator import EmbedPaginator, Paginator
-from .helpers.world_record import WorldRecord
+from .helpers.world_record import WorldRecord, parse_mk8dx_leaderboard
 from .utils import GroupCog
 
 if TYPE_CHECKING:
@@ -25,6 +25,8 @@ if TYPE_CHECKING:
     from model.time_trials import TimeTrialData
 
 MKC_API = "https://mkcentral.com/api"
+MK8DX_LEADERBOARD_CSV = "https://docs.google.com/spreadsheets/d/e/2PACX-1vRBXBdqpurvBmR--bzj9RJmgr7HxAoWVZmlwmhaBK-LYf_BbXn8iAPdH-ogBtXiAwxlTkQgn45PkeRW/pub?gid=0&single=true&output=csv"
+MK8DX_LEADERBOARD_TIMEOUT = aiohttp.ClientTimeout(total=60)
 
 
 # ref: https://github.com/MarioKartCentral/MarioKartCentral/blob/main/src/backend/common/data/models/time_trials_api.py
@@ -67,11 +69,14 @@ logger = logging.getLogger(__name__)
 class TimeTrial(GroupCog, name="NITA", description="NITA関連", group_name="nita"):
     if TYPE_CHECKING:
         _wr_cache: dict[str, WorldRecord]
+        _mk8dx_wrs: dict[str, WorldRecord]
 
     def __init__(self, bot: Bot) -> None:
         super().__init__(bot)
         self._wr_cache = {}
+        self._mk8dx_wrs = {}
         self.cleanup_cache.start()
+        self.refresh_mk8dx_wrs.start()
 
     @commands.hybrid_command(
         name="game",
@@ -468,6 +473,10 @@ class TimeTrial(GroupCog, name="NITA", description="NITA関連", group_name="nit
         await Paginator(pages=paginator.to_pages(), context=ctx).start()
 
     async def fetch_wr(self, track: Track) -> WorldRecord | None:
+        """コースのWRを取得する. MK8DXは定期取得済みのデータを返す."""
+        if track.game is Game.MK8DX:
+            return self._mk8dx_wrs.get(track.id)
+
         key = f"{track.game.id}:{track.id}"
         if key in self._wr_cache:
             return self._wr_cache[key]
@@ -478,10 +487,7 @@ class TimeTrial(GroupCog, name="NITA", description="NITA関連", group_name="nit
         return wr
 
     async def fetch_wr_without_cache(self, track: Track) -> WorldRecord | None:
-        # TODO:
-        if track.game is Game.MK8DX:
-            return None
-
+        """MKCentralからコースのWRを取得する."""
         url = f"{MKC_API}/time-trials/leaderboard"
         params = {"game": track.game.id, "track": track.id}
 
@@ -513,6 +519,31 @@ class TimeTrial(GroupCog, name="NITA", description="NITA関連", group_name="nit
     async def cleanup_cache(self) -> None:
         self._wr_cache.clear()
         self.repo.clear_game_cache()
+
+    @tasks.loop(hours=3.0)
+    async def refresh_mk8dx_wrs(self) -> None:
+        """MK8DXの全コースのWRをスプレッドシートから一括取得する."""
+        try:
+            async with self.bot.session.get(
+                MK8DX_LEADERBOARD_CSV, timeout=MK8DX_LEADERBOARD_TIMEOUT
+            ) as resp:
+                if not resp.ok:
+                    logger.error(f"MK8DX leaderboard returned {resp.status}.")
+                    return
+
+                text = await resp.text(encoding="utf-8")
+        except (aiohttp.ClientError, TimeoutError):
+            logger.exception("MK8DX leaderboard request failed.")
+            return
+
+        records = parse_mk8dx_leaderboard(text)
+
+        if not records:
+            logger.error("MK8DX leaderboard has no WR.")
+            return
+
+        self._mk8dx_wrs = records
+        logger.info(f"Loaded {len(records)} MK8DX WRs.")
 
 
 async def setup(bot: Bot) -> None:
