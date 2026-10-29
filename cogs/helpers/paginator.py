@@ -32,11 +32,6 @@ if TYPE_CHECKING:
         template: Embed
         fields: list[EmbedField]
 
-else:
-    PaginatorStartKwargs = dict
-    PaginatorEditKwargs = dict
-    EmbedField = dict
-    EmbedSection = dict
 
 __all__ = (
     "Page",
@@ -113,22 +108,8 @@ class Paginator(View):
         is_first = self.current_page <= 0
         is_last = self.current_page >= self.page_count - 1
         self.indicator.label = f"{self.current_page + 1}/{self.page_count}"
-
-        for btn in [
-            self.goto_first,
-            self.goto_prev,
-            self.goto_next,
-            self.goto_last,
-        ]:
-            btn.disabled = False
-
-        if is_first:
-            self.goto_first.disabled = True
-            self.goto_prev.disabled = True
-
-        elif is_last:
-            self.goto_next.disabled = True
-            self.goto_last.disabled = True
+        self.goto_first.disabled = self.goto_prev.disabled = is_first
+        self.goto_next.disabled = self.goto_last.disabled = is_last
 
     @property
     def page_count(self) -> int:

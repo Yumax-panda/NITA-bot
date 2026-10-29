@@ -5,7 +5,7 @@ from typing import TYPE_CHECKING
 from discord.ext import commands
 
 from error import BotError
-from game_data import Game, track_class
+from game_data import track_class
 from utils.time import input_text_to_time_ms
 
 if TYPE_CHECKING:
@@ -25,19 +25,6 @@ class TrackConverter(commands.Converter["Track"]):
             )
 
         return track
-
-
-class GameConverter(commands.Converter[Game]):
-    async def convert(self, _: commands.Context[Bot], argument: str) -> Game:
-        game = Game.from_input(argument)
-
-        if game is None:
-            raise BotError(
-                f"入力: {argument}に該当するゲームが見つかりませんでした．"
-                "`world`または`8dx`を指定してください．"
-            )
-
-        return game
 
 
 class TimeMsConverter(commands.Converter[int]):

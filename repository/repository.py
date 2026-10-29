@@ -61,20 +61,15 @@ def get_repository(
         database=db_name,
     )
 
-    if ssl_ca_path:
-        ssl_context = ssl.create_default_context(cafile=ssl_ca_path)
-        engine = create_async_engine(
-            dsn,
-            echo=echo,
-            pool_pre_ping=True,
-            connect_args={"ssl": ssl_context},
-        )
-    else:
-        engine = create_async_engine(
-            dsn,
-            echo=echo,
-            pool_pre_ping=True,
-        )
+    connect_args = (
+        {"ssl": ssl.create_default_context(cafile=ssl_ca_path)} if ssl_ca_path else {}
+    )
+    engine = create_async_engine(
+        dsn,
+        echo=echo,
+        pool_pre_ping=True,
+        connect_args=connect_args,
+    )
 
     return Repository(engine)
 
@@ -113,14 +108,8 @@ class Repository:
             time_ms=time_ms,
         )
 
-        async with self.engine.connect() as conn, conn.begin() as tx:
-            try:
-                await conn.execute(query)
-                await tx.commit()
-
-            except Exception as e:
-                await tx.rollback()
-                raise e
+        async with self.engine.begin() as conn:
+            await conn.execute(query)
 
     async def get_leader_board(
         self, user_discord_ids: list[str], track: Track
@@ -210,14 +199,9 @@ class Repository:
             time_trials.c.track == track.id,
         )
 
-        async with self.engine.connect() as conn, conn.begin() as tx:
-            try:
-                result = await conn.execute(query)
-                await tx.commit()
-                return result.rowcount > 0
-            except Exception as e:
-                await tx.rollback()
-                raise e
+        async with self.engine.begin() as conn:
+            result = await conn.execute(query)
+        return result.rowcount > 0
 
     async def delete_latest_time_trial(
         self, user_discord_id: str, track: Track
@@ -247,24 +231,16 @@ class Repository:
             .limit(1)
         )
 
-        async with self.engine.connect() as conn, conn.begin() as tx:
-            try:
-                result = await conn.execute(select_query)
-                data = result.fetchone()
+        async with self.engine.begin() as conn:
+            result = await conn.execute(select_query)
+            data = result.fetchone()
 
-                if data is None:
-                    await tx.rollback()
-                    return None
+            if data is None:
+                return None
 
-                await conn.execute(
-                    time_trials.delete().where(time_trials.c.id == data.id)
-                )
-                await tx.commit()
+            await conn.execute(time_trials.delete().where(time_trials.c.id == data.id))
 
-                return self._to_time_trial(data)
-            except Exception as e:
-                await tx.rollback()
-                raise e
+        return self._to_time_trial(data)
 
     async def get_user_records(self, user_discord_id: str) -> list[TimeTrialData]:
         """指定したユーザーの全コースの最速タイムを取得する．
@@ -476,13 +452,8 @@ class Repository:
         )
         query = query.on_duplicate_key_update(game=query.inserted.game)
 
-        async with self.engine.connect() as conn, conn.begin() as tx:
-            try:
-                await conn.execute(query)
-                await tx.commit()
-            except Exception as e:
-                await tx.rollback()
-                raise e
+        async with self.engine.begin() as conn:
+            await conn.execute(query)
 
         self._game_cache[user_discord_id] = game
 

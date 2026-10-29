@@ -11,8 +11,6 @@ __all__ = (
     "MK8DXTrack",
     "track_class",
     "all_tracks",
-    "find_tracks",
-    "search_tracks",
 )
 
 type Track = MKWorldTrack | MK8DXTrack
@@ -29,20 +27,3 @@ def track_class(game: Game) -> type[MKWorldTrack] | type[MK8DXTrack]:
 
 def all_tracks(game: Game) -> list[Track]:
     return list(TRACK_CLASSES[game])
-
-
-def find_tracks(nick: str) -> list[tuple[Game, Track]]:
-    found: list[tuple[Game, Track]] = []
-    for game, cls in TRACK_CLASSES.items():
-        track = cls.from_nick(nick)
-        if track is not None:
-            found.append((game, track))
-    return found
-
-
-def search_tracks(nick: str) -> list[tuple[Game, Track]]:
-    found: list[tuple[Game, Track]] = []
-    for game, cls in TRACK_CLASSES.items():
-        for track in cls.search(nick):
-            found.append((game, track))
-    return found
