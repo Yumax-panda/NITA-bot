@@ -13,9 +13,6 @@ if TYPE_CHECKING:
 
 
 class Meta(Cog, name="Meta", description="便利機能"):
-    def __init__(self, bot: Bot) -> None:
-        super().__init__(bot)
-
     @commands.hybrid_command(
         aliases=["h"],
         description="Botやコマンドについてのヘルプを表示する.",

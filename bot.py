@@ -12,7 +12,7 @@ from discord.ext import commands
 from error import BotError
 
 if TYPE_CHECKING:
-    from discord import AppInfo, User
+    from discord import AppInfo
 
     from repository import Repository
 
@@ -76,10 +76,6 @@ class Bot(commands.Bot):
     async def close(self) -> None:
         await super().close()
         await self.session.close()
-
-    @property
-    def owner(self) -> User:
-        return self.bot_app_info.owner
 
     @discord.utils.cached_property
     def stats_webhook(self) -> discord.Webhook:
