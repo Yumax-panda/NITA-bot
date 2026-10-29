@@ -5,8 +5,7 @@ from unittest.mock import MagicMock
 import aiohttp
 import pytest
 
-from cogs.helpers.world_record import WorldRecord
-from cogs.time_trial import TimeTrial
+from cogs.time_trial import TimeTrial, WorldRecord
 from game_data import MK8DXTrack, all_tracks
 from game_data.game import Game
 
@@ -26,7 +25,7 @@ async def test_fetch_wr_returns_none_on_request_failure(error: BaseException) ->
     cog = _make_cog(get)
     track = all_tracks(Game.MKWORLD)[0]
 
-    assert await cog.fetch_wr_without_cache(track) is None
+    assert await cog.fetch_mkworld_wr(track) is None
     get.assert_called_once()
     assert get.call_args.kwargs["params"] == {
         "game": track.game.id,

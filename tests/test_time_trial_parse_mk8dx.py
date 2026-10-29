@@ -1,4 +1,4 @@
-from cogs.helpers.world_record import WorldRecord, parse_mk8dx_leaderboard
+from cogs.time_trial import WorldRecord, parse_mk8dx_leaderboard
 from game_data import MK8DXTrack
 
 SHEET = """\

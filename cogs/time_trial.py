@@ -1,5 +1,7 @@
 from __future__ import annotations
 
+import csv
+import io
 import logging
 from dataclasses import dataclass
 from datetime import datetime, timedelta
@@ -10,14 +12,13 @@ from discord import Color, Embed, app_commands, utils
 from discord.ext import commands, tasks
 
 from error import BotError
-from game_data import Game, Track, track_class
+from game_data import Game, MK8DXTrack, Track, track_class
 from utils.base_model import BaseModel
-from utils.time import display_time, format_time_diff
+from utils.time import display_time, display_time_to_ms, format_time_diff
 
 from .helpers.autocomplete import track_autocomplete
 from .helpers.converter import TimeMsConverter, TrackConverter
 from .helpers.paginator import EmbedPaginator, Paginator
-from .helpers.world_record import WorldRecord, parse_mk8dx_leaderboard
 from .utils import GroupCog
 
 if TYPE_CHECKING:
@@ -26,7 +27,6 @@ if TYPE_CHECKING:
 
 MKC_API = "https://mkcentral.com/api"
 MK8DX_LEADERBOARD_CSV = "https://docs.google.com/spreadsheets/d/e/2PACX-1vRBXBdqpurvBmR--bzj9RJmgr7HxAoWVZmlwmhaBK-LYf_BbXn8iAPdH-ogBtXiAwxlTkQgn45PkeRW/pub?gid=0&single=true&output=csv"
-MK8DX_LEADERBOARD_TIMEOUT = aiohttp.ClientTimeout(total=60)
 
 
 # ref: https://github.com/MarioKartCentral/MarioKartCentral/blob/main/src/backend/common/data/models/time_trials_api.py
@@ -62,6 +62,58 @@ class LeaderboardResponseData(BaseModel):
     records: list[TimeTrialResponseData]
 
 
+@dataclass(frozen=True, slots=True)
+class WorldRecord:
+    time_ms: int
+    player_name: str | None = None
+    proof_url: str | None = None
+
+
+_MK8DX_LEADERBOARD_TRACK_COLUMN = 0
+_MK8DX_LEADERBOARD_RANK_COLUMN = 1
+_MK8DX_LEADERBOARD_PLAYER_COLUMN = 3
+_MK8DX_LEADERBOARD_TIME_COLUMN = 4
+
+_MK8DX_LEADERBOARD_TRACK_IDS = {
+    "bCMn": MK8DXTrack.BCMO.id,
+    "bCMl": MK8DXTrack.BCMA.id,
+    "bRRW": MK8DXTrack.bRR.id,
+}
+
+
+def parse_mk8dx_leaderboard(text: str) -> dict[str, WorldRecord]:
+    """MK8DXのNITAリーダーボード(CSV)から, コースIDごとのWRを取得する."""
+    records: dict[str, WorldRecord] = {}
+    track: MK8DXTrack | None = None
+
+    for row in csv.reader(io.StringIO(text)):
+        if len(row) <= _MK8DX_LEADERBOARD_TIME_COLUMN:
+            continue
+
+        if sheet_id := row[_MK8DX_LEADERBOARD_TRACK_COLUMN].strip():
+            track = MK8DXTrack.from_id(
+                _MK8DX_LEADERBOARD_TRACK_IDS.get(sheet_id, sheet_id)
+            )
+            continue
+
+        if (
+            track is None
+            or track.id in records
+            or row[_MK8DX_LEADERBOARD_RANK_COLUMN] != "1"
+        ):
+            continue
+
+        time_ms = display_time_to_ms(row[_MK8DX_LEADERBOARD_TIME_COLUMN].rstrip("*"))
+
+        if time_ms is not None:
+            records[track.id] = WorldRecord(
+                time_ms=time_ms,
+                player_name=row[_MK8DX_LEADERBOARD_PLAYER_COLUMN].strip() or None,
+            )
+
+    return records
+
+
 logger = logging.getLogger(__name__)
 
 
@@ -75,7 +127,8 @@ class TimeTrial(GroupCog, name="NITA", description="NITA関連", group_name="nit
         super().__init__(bot)
         self._wr_cache = {}
         self._mk8dx_wrs = {}
-        self.cleanup_cache.start()
+        self.cleanup_game_cache.start()
+        self.cleanup_wr_cache.start()
         self.refresh_mk8dx_wrs.start()
 
     @commands.hybrid_command(
@@ -481,13 +534,13 @@ class TimeTrial(GroupCog, name="NITA", description="NITA関連", group_name="nit
         if key in self._wr_cache:
             return self._wr_cache[key]
 
-        wr = await self.fetch_wr_without_cache(track)
+        wr = await self.fetch_mkworld_wr(track)
         if wr is not None:
             self._wr_cache[key] = wr
         return wr
 
-    async def fetch_wr_without_cache(self, track: Track) -> WorldRecord | None:
-        """MKCentralからコースのWRを取得する."""
+    async def fetch_mkworld_wr(self, track: Track) -> WorldRecord | None:
+        """MarioKart WorldのコースのWRを取得する."""
         url = f"{MKC_API}/time-trials/leaderboard"
         params = {"game": track.game.id, "track": track.id}
 
@@ -516,16 +569,20 @@ class TimeTrial(GroupCog, name="NITA", description="NITA関連", group_name="nit
         )
 
     @tasks.loop(hours=1.0)
-    async def cleanup_cache(self) -> None:
-        self._wr_cache.clear()
+    async def cleanup_game_cache(self) -> None:
         self.repo.clear_game_cache()
+
+    @tasks.loop(hours=3.0)
+    async def cleanup_wr_cache(self) -> None:
+        self._wr_cache.clear()
 
     @tasks.loop(hours=3.0)
     async def refresh_mk8dx_wrs(self) -> None:
         """MK8DXの全コースのWRをスプレッドシートから一括取得する."""
         try:
             async with self.bot.session.get(
-                MK8DX_LEADERBOARD_CSV, timeout=MK8DX_LEADERBOARD_TIMEOUT
+                MK8DX_LEADERBOARD_CSV,
+                timeout=aiohttp.ClientTimeout(total=60),
             ) as resp:
                 if not resp.ok:
                     logger.error(f"MK8DX leaderboard returned {resp.status}.")
