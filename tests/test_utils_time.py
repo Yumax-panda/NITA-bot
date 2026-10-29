@@ -1,6 +1,11 @@
 import pytest
 
-from utils.time import display_time, format_time_diff, input_text_to_time_ms
+from utils.time import (
+    display_time,
+    display_time_to_ms,
+    format_time_diff,
+    input_text_to_time_ms,
+)
 
 
 @pytest.mark.parametrize(
@@ -34,6 +39,22 @@ def test_input_text_to_time_ms(text: str, expected: int | None) -> None:
 )
 def test_display_time(time_ms: int, expected: str) -> None:
     assert display_time(time_ms) == expected
+
+
+@pytest.mark.parametrize(
+    ("text", "expected"),
+    [
+        ("2:01.065", 121065),
+        ("0:10.123", 10123),
+        (" 1:38.538 ", 98538),
+        ("1:60.000", None),
+        ("1:38.53", None),
+        ("1:38.538*", None),
+        ("", None),
+    ],
+)
+def test_display_time_to_ms(text: str, expected: int | None) -> None:
+    assert display_time_to_ms(text) == expected
 
 
 @pytest.mark.parametrize(

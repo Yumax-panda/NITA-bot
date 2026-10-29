@@ -2,11 +2,13 @@ import re
 
 __all__ = (
     "input_text_to_time_ms",
+    "display_time_to_ms",
     "display_time",
     "format_time_diff",
 )
 
 _TIME_INPUT_REGEX = re.compile(r"[0-9]{6}")
+_DISPLAY_TIME_REGEX = re.compile(r"([0-9]+):([0-5][0-9])\.([0-9]{3})")
 
 
 def input_text_to_time_ms(text: str) -> int | None:
@@ -34,6 +36,17 @@ def input_text_to_time_ms(text: str) -> int | None:
     if seconds >= 60:
         return None
 
+    return (minutes * 60 + seconds) * 1000 + milliseconds
+
+
+def display_time_to_ms(text: str) -> int | None:
+    """1:23.456のような表示をミリ秒へ変換する. 不正な場合はNoneを返す."""
+    parsed = _DISPLAY_TIME_REGEX.fullmatch(text.strip())
+
+    if parsed is None:
+        return None
+
+    minutes, seconds, milliseconds = map(int, parsed.groups())
     return (minutes * 60 + seconds) * 1000 + milliseconds
 
 
