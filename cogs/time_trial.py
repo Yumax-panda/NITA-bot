@@ -30,17 +30,6 @@ MK8DX_LEADERBOARD_CSV = "https://docs.google.com/spreadsheets/d/e/2PACX-1vRBXBdq
 
 
 # ref: https://github.com/MarioKartCentral/MarioKartCentral/blob/main/src/backend/common/data/models/time_trials_api.py
-@dataclass(frozen=True)
-class ProofResponseData(BaseModel):
-    id: str
-    url: str
-    type: str
-    created_at: str
-    status: str | None = "unvalidated"
-    validator_id: int | None = None
-    validated_at: str | None = None
-
-
 @dataclass(frozen=True, slots=True)
 class TimeTrialResponseData(BaseModel):
     id: str
@@ -49,7 +38,6 @@ class TimeTrialResponseData(BaseModel):
     game: str
     track: str
     time_ms: int
-    proofs: list[ProofResponseData]
     created_at: str
     updated_at: str
     validation_status: str = "proofless"
