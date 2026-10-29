@@ -66,7 +66,6 @@ class LeaderboardResponseData(BaseModel):
 class WorldRecord:
     time_ms: int
     player_name: str | None = None
-    proof_url: str | None = None
 
 
 _MK8DX_LEADERBOARD_TRACK_COLUMN = 0
@@ -377,10 +376,6 @@ class TimeTrial(GroupCog, name="NITA", description="NITA関連", group_name="nit
 
             if wr is not None:
                 wr_value = f"{display_time(wr.time_ms)} (By {wr.player_name or 'N/A'})"
-
-                if wr.proof_url is not None:
-                    wr_value = f"[{wr_value}]({wr.proof_url})"
-
                 e.add_field(name="WR", value=f"> {wr_value}", inline=False)
 
             recent_lines = [
@@ -562,11 +557,7 @@ class TimeTrial(GroupCog, name="NITA", description="NITA関連", group_name="nit
             return None
 
         record = data.records[0]
-        return WorldRecord(
-            time_ms=record.time_ms,
-            player_name=record.player_name,
-            proof_url=record.proofs[0].url if record.proofs else None,
-        )
+        return WorldRecord(time_ms=record.time_ms, player_name=record.player_name)
 
     @tasks.loop(hours=1.0)
     async def cleanup_game_cache(self) -> None:
