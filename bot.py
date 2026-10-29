@@ -48,6 +48,7 @@ class Bot(commands.Bot):
             intents=intents,
             case_insensitive=True,
             help_command=None,
+            allowed_mentions=discord.AllowedMentions.none(),
         )
         self.repo = repo
         self.stats_webhook_url = stats_webhook_url

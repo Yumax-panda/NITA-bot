@@ -49,3 +49,10 @@ async def test_report_error_swallows_http_exception() -> None:
     bot.stats_webhook = webhook
 
     await bot.report_error(_make_exception())
+
+
+def test_bot_disables_all_mentions() -> None:
+    mentions = _make_bot().allowed_mentions
+
+    assert mentions is not None
+    assert mentions.to_dict() == discord.AllowedMentions.none().to_dict()
