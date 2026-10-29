@@ -37,3 +37,12 @@ async def test_all_commands_have_description(bot: Bot) -> None:
         command.qualified_name for command in commands_ if not command.description
     ]
     assert not missing, f"descriptionが設定されていないコマンド: {missing}"
+
+
+async def test_all_commands_have_cooldown(bot: Bot) -> None:
+    missing: list[str] = [
+        command.qualified_name
+        for command in bot.walk_commands()
+        if command.cooldown is None
+    ]
+    assert not missing, f"cooldownが設定されていないコマンド: {missing}"

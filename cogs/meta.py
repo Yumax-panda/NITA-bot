@@ -6,7 +6,7 @@ from discord import Color, Embed
 from discord.ext import commands
 
 from .helpers.paginator import Page, Paginator
-from .utils import Cog
+from .utils import Cog, user_cooldown
 
 if TYPE_CHECKING:
     from bot import Bot
@@ -16,6 +16,7 @@ class Meta(Cog, name="Meta", description="便利機能"):
     def __init__(self, bot: Bot) -> None:
         super().__init__(bot)
 
+    @user_cooldown()
     @commands.hybrid_command(
         aliases=["h"],
         description="Botやコマンドについてのヘルプを表示する.",

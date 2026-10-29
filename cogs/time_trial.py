@@ -16,7 +16,7 @@ from utils.time import display_time, format_time_diff
 from .helpers.autocomplete import track_autocomplete
 from .helpers.converter import TimeMsConverter, TrackConverter
 from .helpers.paginator import EmbedPaginator, Paginator
-from .utils import GroupCog
+from .utils import GroupCog, user_cooldown
 
 if TYPE_CHECKING:
     from bot import Bot
@@ -71,6 +71,7 @@ class TimeTrial(GroupCog, name="NITA", description="NITA関連", group_name="nit
         self._wr_cache = {}
         self.cleanup_cache.start()
 
+    @user_cooldown()
     @commands.hybrid_command(
         name="game",
         description="使用するゲームを設定する.",
@@ -105,6 +106,7 @@ class TimeTrial(GroupCog, name="NITA", description="NITA関連", group_name="nit
         await self.repo.set_user_game(user_discord_id, parsed)
         await ctx.send(f"ゲームを**{parsed.ja}**に設定しました.")
 
+    @user_cooldown()
     @commands.hybrid_command(
         aliases=["s"],
         description="タイムを記録する.",
@@ -156,6 +158,7 @@ class TimeTrial(GroupCog, name="NITA", description="NITA関連", group_name="nit
 
         await ctx.send(embed=e)
 
+    @user_cooldown()
     @commands.hybrid_command(
         aliases=["t", "show"],
         description="指定したコースのタイムを表示する.",
@@ -220,6 +223,7 @@ class TimeTrial(GroupCog, name="NITA", description="NITA関連", group_name="nit
 
         await Paginator(pages=paginator.to_pages(), context=ctx).start()
 
+    @user_cooldown()
     @commands.hybrid_command(
         aliases=["d"],
         description="指定したコースの直近の記録を削除する.",
@@ -249,6 +253,7 @@ class TimeTrial(GroupCog, name="NITA", description="NITA関連", group_name="nit
         e.set_thumbnail(url=track.image_url)
         await ctx.send(embed=e)
 
+    @user_cooldown()
     @commands.hybrid_command(
         aliases=["da"],
         description="指定したコースの記録を全て削除する.",
@@ -277,6 +282,7 @@ class TimeTrial(GroupCog, name="NITA", description="NITA関連", group_name="nit
         e.set_thumbnail(url=track.image_url)
         await ctx.send(embed=e)
 
+    @user_cooldown()
     @commands.hybrid_command(
         aliases=["p"],
         description=(
@@ -401,6 +407,7 @@ class TimeTrial(GroupCog, name="NITA", description="NITA関連", group_name="nit
 
             await Paginator(pages=paginator.to_pages(), context=ctx).start()
 
+    @user_cooldown()
     @commands.hybrid_command(
         name="today",
         description="直近24時間で更新した記録を表示する.",
