@@ -241,10 +241,9 @@ class TimeTrial(GroupCog, name="NITA", description="NITA関連", group_name="nit
         if deleted is None:
             raise BotError(f"{track.ja}の記録が見つかりませんでした.")
 
-        title = track.ja
         e = Embed(
             title="直近の記録を削除しました",
-            description=f"{title}: {display_time(deleted.time_ms)}",
+            description=f"{track.ja}: {display_time(deleted.time_ms)}",
             color=Color.red(),
         )
         e.set_thumbnail(url=track.image_url)
@@ -326,20 +325,16 @@ class TimeTrial(GroupCog, name="NITA", description="NITA関連", group_name="nit
 
                 e.add_field(name="WR", value=f"> {wr_value}", inline=False)
 
-            recent = history[-5:][::-1]  # 新しい順
-            if recent:
-                recent_lines = []
-                for record in recent:
-                    time_str = display_time(record.time_ms)
-                    diff = record.time_ms - pb.time_ms
-                    diff_str = f" ({format_time_diff(diff)})"
-                    recent_lines.append(f"> {time_str}{diff_str}")
-
-                e.add_field(
-                    name=f"最近の記録 (全{len(history)}件)",
-                    value="\n".join(recent_lines),
-                    inline=False,
-                )
+            recent_lines = [
+                f"> {display_time(record.time_ms)} "
+                f"({format_time_diff(record.time_ms - pb.time_ms)})"
+                for record in history[-5:][::-1]  # 新しい順
+            ]
+            e.add_field(
+                name=f"最近の記録 (全{len(history)}件)",
+                value="\n".join(recent_lines),
+                inline=False,
+            )
 
             await ctx.send(embed=e)
 
@@ -474,14 +469,13 @@ class TimeTrial(GroupCog, name="NITA", description="NITA関連", group_name="nit
 
     async def fetch_wr(self, track: Track) -> TimeTrialResponseData | None:
         key = f"{track.game.id}:{track.id}"
-        try:
+        if key in self._wr_cache:
             return self._wr_cache[key]
-        except KeyError:
-            wr = await self.fetch_wr_without_cache(track)
-            if wr is not None:
-                self._wr_cache[key] = wr
-                return wr
-        return None
+
+        wr = await self.fetch_wr_without_cache(track)
+        if wr is not None:
+            self._wr_cache[key] = wr
+        return wr
 
     async def fetch_wr_without_cache(
         self, track: Track
