@@ -20,8 +20,6 @@ __all__ = ("Bot",)
 
 logger = logging.getLogger(__name__)
 
-HTTP_TIMEOUT = aiohttp.ClientTimeout(total=10)
-
 extensions = [
     "cogs.meta",
     "cogs.time_trial",
@@ -55,7 +53,7 @@ class Bot(commands.Bot):
         self.stats_webhook_url = stats_webhook_url
 
     async def setup_hook(self) -> None:
-        self.session = aiohttp.ClientSession(timeout=HTTP_TIMEOUT)
+        self.session = aiohttp.ClientSession(timeout=aiohttp.ClientTimeout(total=10))
 
         for extension in extensions:
             try:
