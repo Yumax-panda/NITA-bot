@@ -24,13 +24,10 @@ target_metadata = metadata
 
 
 def _build_engine():
-    # `alembic -x db_url=...` または環境変数DATABASE_URLで接続文字列を直接指定できる．
-    # 指定が無い場合はDB_*環境変数から構築する(get_repositoryを利用)．
     url = context.get_x_argument(as_dictionary=True).get("db_url") or os.environ.get(
         "DATABASE_URL"
     )
     if url:
-        # mysql:// や mysql+pymysql:// で渡されてもaiomysqlドライバに揃える．
         url = make_url(url).set(drivername="mysql+aiomysql")
         query = dict(url.query)
         ssl_ca = query.pop("ssl_ca", None)
